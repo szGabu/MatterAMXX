@@ -4,13 +4,14 @@
 
 #define MATTERAMXX_PLUGIN_PLUGIN "MatterAMXX Lag Checker"
 #define MATTERAMXX_PLUGIN_AUTHOR "szGabu"
-#define MATTERAMXX_PLUGIN_VERSION "1.5"
+#define MATTERAMXX_PLUGIN_VERSION "1.6-dev"
 
 #pragma semicolon 1
 
 new g_cvarEnabled;
 new g_cvarCpuThreshold;
 new g_cvarFpsThreshold;
+new g_cvarSendAllStatus;
 new g_cvarToPing;
 new g_sStats[MESSAGE_LENGTH];
 
@@ -26,6 +27,7 @@ public plugin_init()
 
     g_cvarEnabled = register_cvar("amx_matter_lagchecker_enabled", "1");
     g_cvarToPing = register_cvar("amx_matter_lagchecker_ping_this_person", "");
+    g_cvarSendAllStatus = register_cvar("amx_matter_lagchecker_send_all_status", "0");
     g_cvarCpuThreshold = register_cvar("amx_matter_lagchecker_cpu_threshold", "75");
     g_cvarFpsThreshold = register_cvar("amx_matter_lagchecker_fps_threshold", "30");
 
@@ -126,9 +128,12 @@ public execute_lag()
     }
     else
     {
-        formatex(s_matterMessage, charsmax(s_matterMessage), "* %L", LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(cpu), floatround(fps));
+        if(get_pcvar_bool(g_cvarSendAllStatus))
+        {
+            formatex(s_matterMessage, charsmax(s_matterMessage), "* %L", LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(cpu), floatround(fps));
+            matteramxx_send_message(s_matterMessage, _, _, true);
+        }
         client_print(0, print_chat, "* %L %L", LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(cpu), floatround(fps), LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_STFU");
-        matteramxx_send_message(s_matterMessage, _, _, true);
     }
 }
 
