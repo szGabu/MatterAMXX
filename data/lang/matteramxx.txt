@@ -1,0 +1,104 @@
+[en]
+MATTERAMXX_RETRYING = Retrying in %d seconds...
+MATTERAMXX_CONN_FAILED = Connection failed.
+MATTERAMXX_MSG_FAILED = Message failed to sent to the bridge.
+MATTERAMXX_INVALID = Invalid message arrived, ignoring.
+MATTERAMXX_ERROR = An error has occured: %s.
+MATTERAMXX_SYSMSG_NOT_SENT = A message arrived, but it was marked as a system message, thus it will not be printed to the players.
+MATTERAMXX_API_SUPERCEDED = A plugin prevented the incoming message from printing: %s
+MATTERAMXX_MESSAGE_KILLED = %s got killed by %s!
+MATTERAMXX_MESSAGE_JOINED = %s joined the game.
+MATTERAMXX_MESSAGE_LEFT = %s has left the game.
+MATTERAMXX_MESSAGE_MAP_CHANGED = Map changed to %s.
+MATTERAMXX_PLUGIN_LAG_STATS = Server is running at %d%%CPU and %dFPS.
+MATTERAMXX_PLUGIN_LAG_STFU = Server is not lagging. Check your computer and internet connection.
+MATTERAMXX_PLUGIN_LAG_NOTIF = The server can't keep up.
+MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE = The server scheduled a restart after this map ends.
+MATTERAMXX_PLUGIN_RCON_UNAUTHORIZED = You don't have access to this command.
+MATTERAMXX_PLUGIN_RCON_DENIED = This command will not be executed.
+MATTERAMXX_PLUGIN_RCON_HAL = I'm sorry, %s. I'm afraid I can't do that.
+MATTERAMXX_PLUGIN_RCON_NO_OUTPUT = The command is not supported, the command will be executed but no output will be shown.
+
+[es]
+MATTERAMXX_RETRYING = Reintentando en %d segundos...
+MATTERAMXX_CONN_FAILED = La conexión ha fallado.
+MATTERAMXX_MSG_FAILED = El mensaje no se ha podido enviar al puente.
+MATTERAMXX_INVALID = Llegó un mensaje no valido, ignorando.
+MATTERAMXX_ERROR = Un error ha ocurrido: %s
+MATTERAMXX_API_SUPERCEDED = Un plugin evitó que el siguiente mensaje se enviara: %s
+MATTERAMXX_MESSAGE_KILLED = ¡%s murió a manos de %s!
+MATTERAMXX_MESSAGE_JOINED = %s se ha unido al servidor.
+MATTERAMXX_MESSAGE_LEFT = %s ha abandonado el servidor.
+MATTERAMXX_MESSAGE_MAP_CHANGED = El mapa fue cambiado a %s.
+MATTERAMXX_PLUGIN_LAG_STATS = El servidor está corriendo a %i%% de CPU y a %iFPS.
+MATTERAMXX_PLUGIN_LAG_STFU = El servidor no está lag. Revisa tu sistema y conexión a internet.
+MATTERAMXX_PLUGIN_LAG_NOTIF = El servidor no puede soportar la carga.
+MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE = El servidor se reiniciará después de este mapa.
+MATTERAMXX_PLUGIN_RCON_UNAUTHORIZED = No tienes acceso a este comando.
+MATTERAMXX_PLUGIN_RCON_DENIED = Este comando no será ejecutado.
+MATTERAMXX_PLUGIN_RCON_HAL = Lo siento, %s. Me temo que no puedo hacer eso.
+MATTERAMXX_PLUGIN_RCON_NO_OUTPUT = El comando se ejecutará pero no se mostrará una respuesta debido a una limitación.
+
+[ro]
+MATTERAMXX_RETRYING =  Incearca din nou in %d secunde...
+MATTERAMXX_CONN_FAILED = Conexiune esuata.
+MATTERAMXX_MSG_FAILED = Mesajul nu a putut fi trimis.
+MATTERAMXX_INVALID = Mesaj invalid.
+MATTERAMXX_ERROR = A aparut o eroare: %s.
+MATTERAMXX_API_SUPERCEDED = Un plugin a impiedicat trimiterea mesajului: %s
+MATTERAMXX_PLUGIN_LAG_STATS = Serverul ruleaza pe %d%%CPU si %dFPS.
+MATTERAMXX_PLUGIN_LAG_STFU = Serverul nu are lag. Verifica-ti conexiunea la internet si calculatorul.
+MATTERAMXX_PLUGIN_LAG_NOTIF = Serverul nu poate tine pasul.
+MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE = Serverul e programat pentru restart dupa terminatarea hartii.
+MATTERAMXX_PLUGIN_RCON_UNAUTHORIZED = Nu ai acces la aceasta comanda.
+MATTERAMXX_PLUGIN_RCON_DENIED = Aceasta comanda nu a putut fi executata.
+MATTERAMXX_PLUGIN_RCON_HAL = Scuze, %s, dar nu pot face acest lucru.
+MATTERAMXX_PLUGIN_RCON_NO_OUTPUT = Din motive de securitate, comanda nu va fi afisata.
+
+[tr]
+MATTERAMXX_RETRYING = %d saniye icinde yeniden deneniyor...
+MATTERAMXX_CONN_FAILED = Baglanti basarisiz.
+MATTERAMXX_MSG_FAILED = Mesaj kopruye gonderilmede basarisiz.
+MATTERAMXX_INVALID = Gecersiz mesaja ulasildi, es geciliyor.
+MATTERAMXX_ERROR = Bir hata olustu: %s.
+MATTERAMXX_API_SUPERCEDED = Bir eklenti gelen mesaji onledi: %s
+MATTERAMXX_PLUGIN_LAG_STATS = Sunucu %d%%CPU ve %dFPS olarak calisiyor.
+MATTERAMXX_PLUGIN_LAG_STFU = Sunucu lagli degil. Bilgisayarini ve internet baglantini kontrol et.
+MATTERAMXX_PLUGIN_LAG_NOTIF = Sunucu devam edemiyor.
+MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE = Sunucu harita bittikten sonra yeniden baslatmaya programladi.
+MATTERAMXX_PLUGIN_RCON_UNAUTHORIZED = Bu komuta erisiminiz yok.
+MATTERAMXX_PLUGIN_RCON_DENIED = Bu komut gerceklestirilmeyecek.
+MATTERAMXX_PLUGIN_RCON_HAL = Uzgunum, %s. Korkarim onu yapamam.
+MATTERAMXX_PLUGIN_RCON_NO_OUTPUT = Guvenlik icin, komut gerceklestirilecek ama hic cikti gosterilmeyecek.
+
+[al]
+MATTERAMXX_RETRYING = Duke provuar në %s sekonda...
+MATTERAMXX_CONN_FAILED = Lidhja dështoi.
+MATTERAMXX_MSG_FAILED = Mesazhi dështoi që të dërgohet tek ura lidhëse.
+MATTERAMXX_INVALID = Një mesazh i pavlefshëm erdhi, do lihet anash.
+MATTERAMXX_ERROR = Një gabim ndodhi: %s.
+MATTERAMXX_API_SUPERCEDED = Një shtojcë parandaloi mesazhin që po vinte: %s
+MATTERAMXX_PLUGIN_LAG_STATS = Serveri po punon %d%%CPU dhe %dFPS.
+MATTERAMXX_PLUGIN_LAG_STFU = Serveri nuk po vonohet. Shikojeni pajisjen dhe rrjetin tuaj.
+MATTERAMXX_PLUGIN_LAG_NOTIF = Serveri nuk mund të vazhdoj.
+MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE = Serveri caktoi një rifillim pas kësaj harte.
+MATTERAMXX_PLUGIN_RCON_UNAUTHORIZED = Ju nuk keni qasje për këtë komandë.
+MATTERAMXX_PLUGIN_RCON_DENIED = Kjo komandë nuk do zbatohet.
+MATTERAMXX_PLUGIN_RCON_HAL = Më falni, %s. Frigohem se nuk mundem ta bëj atë.
+MATTERAMXX_PLUGIN_RCON_NO_OUTPUT = Për siguri, komanda do të zbatohet por asnjë dalje(rezultat) nuk do tregohet.
+
+[ru]
+MATTERAMXX_RETRYING = Повторная попытка через %d секунд ...
+MATTERAMXX_CONN_FAILED = Ошибка подключения.
+MATTERAMXX_MSG_FAILED = Сообщение не удалось отправить на мост.
+MATTERAMXX_INVALID = Получено неверное сообщение, игнорируется.
+MATTERAMXX_ERROR = Произошла ошибка: %s.
+MATTERAMXX_API_SUPERCEDED = Плагин предотвращает входящее сообщение: %s
+MATTERAMXX_PLUGIN_LAG_STATS = Сервер работает на %d%%ЦП и %dFPS.
+MATTERAMXX_PLUGIN_LAG_STFU = Сервер не отстает. Проверьте свой компьютер и подключение к интернету.
+MATTERAMXX_PLUGIN_LAG_NOTIF = Сервер не может идти в ногу.
+MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE = Сервер запланировал перезапуск после окончания карты.
+MATTERAMXX_PLUGIN_RCON_UNAUTHORIZED = У вас нет доступа к этой команде.
+MATTERAMXX_PLUGIN_RCON_DENIED = Эта команда не будет выполнена.
+MATTERAMXX_PLUGIN_RCON_HAL = Извините, %s. Боюсь, я не могу этого сделать.
+MATTERAMXX_PLUGIN_RCON_NO_OUTPUT = В целях безопасности команда будет выполнена, но выходные данные не будут показаны.
