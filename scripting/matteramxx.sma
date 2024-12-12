@@ -437,6 +437,9 @@ public plugin_cfg()
 
             g_hPrintMessageForward = CreateMultiForward("matteramxx_print_message", ET_STOP, FP_STRING, FP_STRING, FP_STRING, FP_STRING);
 
+            if(g_iPluginFlags & AMX_FLAG_DEBUG)
+                server_print("[DEBUG] matteramxx.amxx::plugin_cfg() - g_fIncomingUpdateTime is %f", g_fIncomingUpdateTime);
+
             set_task(g_fIncomingUpdateTime, "MatterConnectAPI");
 
             if(!empty(g_szIncomingIgnorePrefix))
@@ -513,21 +516,31 @@ public Event_Intermission()
 
 public MatterConnectAPI()
 {
+    if(g_iPluginFlags & AMX_FLAG_DEBUG)
+        server_print("[DEBUG] matteramxx.amxx::MatterConnectAPI() - Called");
+
     g_gripIncomingHandle = grip_request(g_szIncomingUri, Empty_GripBody, GripRequestTypeGet, "MatterIncomingMessage", g_gIncomingHeader);
 }
 
 public MatterRetryConnection()
 {
+    if(g_iPluginFlags & AMX_FLAG_DEBUG)
+        server_print("[DEBUG] matteramxx.amxx::MatterRetryConnection() - Called");
+
     server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_RETRYING", floatround(g_fRetryDelay));
     set_task(g_fRetryDelay, "MatterConnectAPI");
 }
 
 public MatterIncomingMessage()
 {
+    if(g_iPluginFlags & AMX_FLAG_DEBUG)
+        server_print("[DEBUG] matteramxx.amxx::MatterIncomingMessage() - Called");
+
     if(grip_get_response_state() != GripResponseStateSuccessful)
     {
         server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_CONN_FAILED");
         MatterRetryConnection();
+        return;
     }
 
     new sIncomingMessage[INCOMING_BUFFER_LENGTH], sJsonError[MESSAGE_LENGTH], GripJSONValue:gJson;
@@ -540,6 +553,9 @@ public MatterIncomingMessage()
 
     if(!empty(sJsonError))
     {
+        if(g_iPluginFlags & AMX_FLAG_DEBUG)
+            server_print("[DEBUG] matteramxx.amxx::MatterIncomingMessage() - Json Error");
+
         server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_INVALID");
         set_task(g_fRetryDelay, "MatterConnectAPI");
         return;
@@ -608,6 +624,15 @@ public Event_RelayUserChangeName(msgid, dest, receiver)
 
 public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProtocol[MAX_NAME_LENGTH], szUserIdentifier[MAX_NAME_LENGTH])
 {
+    if(g_iPluginFlags & AMX_FLAG_DEBUG)
+    {
+        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - Called");
+        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szMessage is %s", szMessage);
+        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szUserName is %s", szUserName);
+        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szProtocol is %s", szProtocol);
+        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szUserIdentifier is %s", szUserIdentifier);
+    }
+
     new iReturnVal = 0;
     new szMessageNew[MESSAGE_LENGTH];
     ExecuteForward(g_hPrintMessageForward, iReturnVal, szMessage, szUserName, szProtocol, szUserIdentifier);
@@ -644,6 +669,9 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
                 else
                     formatex(szMessageNew, charsmax(szMessageNew), "%s^1: %s", szUserName, szMessage);
 
+                if(g_iPluginFlags & AMX_FLAG_DEBUG)
+                    server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szMessageNew %s", szMessageNew);
+
                 client_print_color(0, is_red ? print_team_red : print_team_blue, szMessageNew); 
             }
             else  
@@ -660,9 +688,9 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
                 {
                     //so far all goldsrc games have the init string control character at the start
                     if(strlen(g_szOutgoingCopyBack) > 0)
-                        formatex(szMessageNew, charsmax(szMessageNew), "^2%s %s: %s", g_szOutgoingCopyBack, szUserName, szMessage);
+                        formatex(szMessageNew, charsmax(szMessageNew), "%s %s: %s", g_szOutgoingCopyBack, szUserName, szMessage);
                     else
-                        formatex(szMessageNew, charsmax(szMessageNew), "^2%s: %s", szUserName, szMessage);
+                        formatex(szMessageNew, charsmax(szMessageNew), "%s: %s", szUserName, szMessage);
                     
                     client_print(0, print_chat, szMessageNew);
                 }
@@ -679,18 +707,18 @@ public AddMessageToRelayQueue(const szMessage[], const szUserName[], const iClie
 {
     new aMessageData[aMessageQueueStruct];
     copy(aMessageData[szMessageQueueName], charsmax(aMessageData), szUserName);
-    copy(aMessageData[szMessageQueueMessage], charsmax(aMessageData), szUserName);
+    copy(aMessageData[szMessageQueueMessage], charsmax(aMessageData), szMessage);
     aMessageData[iMessageQueueClient] = 0;
     ArrayPushArray(g_aMessageQueue, aMessageData);
 
     if(!g_bProcessingMessageQueue)
     {
         g_bProcessingMessageQueue = true;
-        ProcesszMessageQueue();
+        ProcessMessageQueue();
     }
 }
 
-public ProcesszMessageQueue()
+public ProcessMessageQueue()
 {
     if(ArraySize(g_aMessageQueue) > 0)
     {
@@ -719,9 +747,9 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
     new szNewUserName[MAX_NAME_LENGTH];
     copy(szNewUserName, charsmax(szNewUserName), szUserName);
 
-    //the following symbols are known to glitch out the chat
+    // the following symbols are known to glitch out the chat
     replace_all(szNewUserName, charsmax(szNewUserName), "#", "¤");
-    //replace_all(szNewUserName, charsmax(szNewUserName), "@", "¤"); //apparently it only causes problems in Windows clients
+    // replace_all(szNewUserName, charsmax(szNewUserName), "@", "¤"); // apparently it only causes problems in Windows clients
 
     if(iClient == 0)
     {
@@ -735,12 +763,12 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
         g_bShouldBlockChangeNameMessage = true;
         set_user_info(iClient, "name", szNewUserName);
 
-        //we need to wait for the name change to propagate to clients
+        // we need to wait for the name change to propagate to clients
         set_task(floatmax(get_highest_ping()/1000.0, 0.1), "PrintRelayUser_Post", FAKEBOT_TASK_ID+iClient, szMessage, MESSAGE_LENGTH);
     }
     else
     {
-        //if not 0, the user said this, call this thing directly because there's no propagation needed
+        // if not 0, the user said this, call this thing directly because there's no propagation needed
         PrintRelayUser_Post(szMessage, iClient);  
     }
 }
@@ -819,7 +847,7 @@ public ChangeNameBack(iTaskId)
 public EnableNameChangeMsg()
 {
     g_bShouldBlockChangeNameMessage = false;
-    ProcesszMessageQueue();
+    ProcessMessageQueue();
 }
 
 public Event_SayMessage(iClient)
