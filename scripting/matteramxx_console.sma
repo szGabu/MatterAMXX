@@ -35,7 +35,7 @@
 #define STATS_FORMAT                    "CPU   In    Out   Uptime  Users   FPS    Players^n%s^n"
 #define MATTERAMXX_PLUGIN_NAME          "MatterAMXX RCON"
 #define MATTERAMXX_PLUGIN_AUTHOR        "szGabu"
-#define MATTERAMXX_PLUGIN_VERSION       "1.6-rc"
+#define MATTERAMXX_PLUGIN_VERSION       "1.6-RC1"
 
 #pragma semicolon 1
 

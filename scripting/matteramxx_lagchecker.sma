@@ -10,7 +10,7 @@
 
 #define MATTERAMXX_PLUGIN_PLUGIN        "MatterAMXX Lag Checker"
 #define MATTERAMXX_PLUGIN_AUTHOR        "szGabu"
-#define MATTERAMXX_PLUGIN_VERSION       "1.6-dev"
+#define MATTERAMXX_PLUGIN_VERSION       "1.6-RC1"
 
 #define REGEX_STATUS                    "LB\s*(\d*\.\d*)\s*\d*\.\d*\s*\d*\.\d*\s*\d*\s*\d*\s*(\d*\.\d*)"
 
@@ -110,12 +110,13 @@ public execute_lag()
         new Float:fCpuPercent = str_to_float(szCpuField);
         new Float:iFpsValue = str_to_float(szFpsField);
 
+        //my source is that I made it the fuck out
         new Float:fIdealTicrate = get_cvar_num("sys_ticrate")*0.90;
         new iComparedFpsValue = floatround((iFpsValue/fIdealTicrate)*100);
 
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
         {
-            server_print("[MatterAMXX Lag Checker Debug] Ideal ticrate is: %d", floatround(fIdealTicrate));
+            server_print("[MatterAMXX Lag Checker Debug] Ideal desired FPS is: %d", floatround(fIdealTicrate));
             server_print("[MatterAMXX Lag Checker Debug] Server is running at an ideal %d%% of the desired FPS", iComparedFpsValue);
         }
 
