@@ -1,10 +1,18 @@
 #include <amxmodx>
-#include <orpheu>
-#include <matteramxx>
 
-#define MATTERAMXX_PLUGIN_PLUGIN "MatterAMXX Lag Checker"
-#define MATTERAMXX_PLUGIN_AUTHOR "szGabu"
-#define MATTERAMXX_PLUGIN_VERSION "1.6-dev"
+#if AMXX_VERSION_NUM < 183
+#assert "AMX Mod X versions 1.8.2 and below are not supported. Please upgrade your shit."
+#endif
+
+#include <fake_rcon>
+#include <matteramxx>
+#include <regex>
+
+#define MATTERAMXX_PLUGIN_PLUGIN        "MatterAMXX Lag Checker"
+#define MATTERAMXX_PLUGIN_AUTHOR        "szGabu"
+#define MATTERAMXX_PLUGIN_VERSION       "1.6-dev"
+
+#define REGEX_STATUS                    "LB\s*(\d*\.\d*)\s*\d*\.\d*\s*\d*\.\d*\s*\d*\s*\d*\s*(\d*\.\d*)"
 
 #pragma semicolon 1
 
@@ -13,10 +21,12 @@ new g_cvarCpuThreshold;
 new g_cvarFpsThreshold;
 new g_cvarSendAllStatus;
 new g_cvarToPing;
-new g_sStats[MESSAGE_LENGTH];
+new g_szStats[MESSAGE_LENGTH];
 
 new g_iPluginFlags;
 new g_bRestartScheduled = false;
+
+new Regex:g_rPattern;
 
 public plugin_init()
 {
@@ -48,6 +58,8 @@ public plugin_cfg()
                 server_print("[MatterAMXX Lag Checker Debug] Plugin is enabled.");
                 server_print("[MatterAMXX Lag Checker Debug] Finished plugin_cfg()");
             }
+
+            g_rPattern = regex_compile_ex(REGEX_STATUS);
         }
         else
             set_fail_state("This plugin requires MatterAMXX to be loaded.");
@@ -56,7 +68,7 @@ public plugin_cfg()
         pause("ad");
 }
 
-public say_message(id)
+public say_message(iClient)
 {
     new sMessage[MESSAGE_LENGTH];
     read_args(sMessage, charsmax(sMessage));
@@ -64,7 +76,7 @@ public say_message(id)
     if (empty(sMessage))
         return PLUGIN_CONTINUE;
 
-    if(id)
+    if(iClient)
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
             server_print("[MatterAMXX Lag Checker Debug] Message is: %s", sMessage);
@@ -83,67 +95,60 @@ public say_message(id)
 
 public execute_lag()
 {
-    g_sStats = "";
-    new OrpheuHook:handlePrintf = OrpheuRegisterHook(OrpheuGetFunction("Con_Printf"), "Con_Printf");
-
-    server_cmd("stats");
-    server_exec();
+    g_szStats = "";
     
-    OrpheuUnregisterHook(handlePrintf);
+    fake_rcon(g_szStats, sizeof(g_szStats), "stats");
 
-    const tokensN  = 7;
-    const tokenLen = 19;
-    
-    static tokens[tokensN][tokenLen + 1];
+    replace_all(g_szStats, charsmax(g_szStats), "^n", "LB");
 
-    for (new i = 0; i < tokensN; i++)
+    new szCpuField[16], szFpsField[16];
+    if(regex_match_c(g_szStats, g_rPattern))
     {
-        trim(g_sStats);
-        strtok(g_sStats, tokens[i], tokenLen, g_sStats, charsmax( g_sStats ), ' '); 
-    }
+        regex_substr(g_rPattern, 1, szCpuField, charsmax(szCpuField));
+        regex_substr(g_rPattern, 2, szFpsField, charsmax(szFpsField));
 
-    new Float:cpu = str_to_float(tokens[0]);
-    new Float:fps = str_to_float(tokens[5]);
+        new Float:fCpuPercent = str_to_float(szCpuField);
+        new Float:iFpsValue = str_to_float(szFpsField);
 
-    new Float:ideal_sys_ticrate = get_cvar_num("sys_ticrate")*0.90;
-    new fps_percent = floatround((fps/ideal_sys_ticrate)*100);
+        new Float:fIdealTicrate = get_cvar_num("sys_ticrate")*0.90;
+        new iComparedFpsValue = floatround((iFpsValue/fIdealTicrate)*100);
 
-    if(g_iPluginFlags & AMX_FLAG_DEBUG)
-    {
-        server_print("[MatterAMXX Lag Checker Debug] Ideal ticrate is: %s", floatround(ideal_sys_ticrate));
-        server_print("[MatterAMXX Lag Checker Debug] Server is running at %s%% FPS", fps_percent);
-    }
+        if(g_iPluginFlags & AMX_FLAG_DEBUG)
+        {
+            server_print("[MatterAMXX Lag Checker Debug] Ideal ticrate is: %d", floatround(fIdealTicrate));
+            server_print("[MatterAMXX Lag Checker Debug] Server is running at an ideal %d%% of the desired FPS", iComparedFpsValue);
+        }
 
-    new s_matterMessage[MESSAGE_LENGTH];
+        new szMatterMessage[MESSAGE_LENGTH];
 
-    if(floatround(cpu) > get_pcvar_num(g_cvarCpuThreshold) || fps_percent < get_pcvar_num(g_cvarFpsThreshold))
-    {
-        client_print(0, print_chat, "* %L %L", LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(cpu), floatround(fps), LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE");
-        new s_toPing[MAX_NAME_LENGTH];
-        get_pcvar_string(g_cvarToPing, s_toPing, charsmax(s_toPing));
-        formatex(s_matterMessage, charsmax(s_matterMessage), "%s %L %L", s_toPing, LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(cpu), floatround(fps), LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_NOTIF");
-        matteramxx_send_message(s_matterMessage, _, _, true);
-        register_message(SVC_INTERMISSION, "map_end");
-        g_bRestartScheduled = true;
+        if(floatround(fCpuPercent) > get_pcvar_num(g_cvarCpuThreshold) || iComparedFpsValue < get_pcvar_num(g_cvarFpsThreshold))
+        {
+            client_print(0, print_chat, "* %L %L", LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(fCpuPercent), floatround(iFpsValue), LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE");
+            new szWhoToPing[MAX_NAME_LENGTH];
+            get_pcvar_string(g_cvarToPing, szWhoToPing, charsmax(szWhoToPing));
+            formatex(szMatterMessage, charsmax(szMatterMessage), "%s %L %L", szWhoToPing, LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(fCpuPercent), floatround(iFpsValue), LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_NOTIF");
+            matteramxx_send_message(szMatterMessage, _, _, true);
+            register_message(SVC_INTERMISSION, "Event_Intermission");
+            g_bRestartScheduled = true;
+        }
+        else
+        {
+            if(get_pcvar_bool(g_cvarSendAllStatus))
+            {
+                formatex(szMatterMessage, charsmax(szMatterMessage), "* %L", LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(fCpuPercent), floatround(iFpsValue));
+                matteramxx_send_message(szMatterMessage, _, _, true);
+            }
+            client_print(0, print_chat, "* %L %L", LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(fCpuPercent), floatround(iFpsValue), LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_STFU");
+        }
     }
     else
     {
-        if(get_pcvar_bool(g_cvarSendAllStatus))
-        {
-            formatex(s_matterMessage, charsmax(s_matterMessage), "* %L", LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(cpu), floatround(fps));
-            matteramxx_send_message(s_matterMessage, _, _, true);
-        }
-        client_print(0, print_chat, "* %L %L", LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(cpu), floatround(fps), LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_STFU");
+        if(g_iPluginFlags & AMX_FLAG_DEBUG)
+            server_print("[MatterAMXX Lag Checker Debug] Failure to check regex match");
     }
 }
 
-public OrpheuHookReturn:Con_Printf(const a[], const message[])
-{
-    copy(g_sStats, charsmax(g_sStats), message);
-    return OrpheuSupercede;
-}
-
-public map_end()
+public Event_Intermission()
 {
     server_cmd("quit");
     server_exec();
