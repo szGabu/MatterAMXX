@@ -109,7 +109,7 @@ new g_cvarOutgoing_Chat_SpamFil;
 new g_cvarOutgoing_Chat_ZeroifyAtSign;
 new g_cvarOutgoing_Chat_RequirePrefix;
 new g_cvarOutgoing_Chat_MuteServer;
-new g_cvarOutgoing_Chat_CopyBack;
+new g_cvarForcePrefix;
 new g_cvarOutgoing_Kills;
 new g_cvarOutgoing_Join;
 new g_cvarOutgoing_Join_Delay;
@@ -151,7 +151,7 @@ new bool:g_bOutgoingNoRepeat = false;
 new bool:g_bOutgoingZwspAt = false;
 new g_szOutgoingRequirePrefix[SHORT_LENGTH];
 new bool:g_bOutgoingMuteServer = false;
-new g_szOutgoingCopyBack[SHORT_LENGTH];
+new g_szForcePrefix[SHORT_LENGTH];
 new bool:g_bOutgoingKills = false;
 new bool:g_bOutgoingJoin = false;
 new Float:g_fOutgoingJoinDelay = 0.0;
@@ -218,6 +218,9 @@ enum _: aMessageQueueStruct
     iMessageQueueClient
 }
 
+/**
+ * Holds the currently running game
+ */
 new aCurrentGame:g_hCurrentGame = GAME_UNKNOWN;
 
 public plugin_natives()
@@ -228,6 +231,8 @@ public plugin_natives()
 
 public plugin_init()
 {
+    register_plugin(MATTERAMXX_PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR);
+
     new sServername[MAX_NAME_LENGTH];
     get_modname(g_szGamename, charsmax(g_szGamename));
 
@@ -250,40 +255,42 @@ public plugin_init()
 
     get_cvar_string("hostname", sServername, charsmax(sServername));
 
-    register_plugin(MATTERAMXX_PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR);
+    g_cvarEnabled = create_cvar(                            "amx_matter_enable",                                    "1",                                                    FCVAR_NONE,                                         "Determines if MatterAMXX should be enabled.", true, 0.0, true, 1.0);
+    g_cvarSystemAvatarUrl = create_cvar(                    "amx_matter_system_avatar",                             "",                                                     FCVAR_PROTECTED,                                    "URL pointing to a picture that will be used as avatar image in system messages (In protocols that support it).");
+    g_cvarAutogenAvatarUrl = create_cvar(                   "amx_matter_autogenerate_avatar",                       "https://robohash.org/%s.png?set=set4",                 FCVAR_PROTECTED,                                    "URL pointing to a picture that will be used as avatar image in unauthenticated player messages (In protocols that support it).");
+    g_cvarAvatarUrl = create_cvar(                          "amx_matter_player_avatar",                             "http://yourhost/avatars/get_avatar.php?steamid=%s",    FCVAR_PROTECTED,                                    "URL pointing to a picture that will be used as avatar image in player messages (In protocols that support it), note that this is dynamic based on the user's Steam ID64, if it can't be retrieved the message will use unauthenticated avatars.");
+    g_cvarBridgeProtocol = create_cvar(                     "amx_matter_bridge_protocol",                           "http",                                                 FCVAR_PROTECTED,                                    "Protocol of where the bridge is located.");
+    g_cvarBridgeHost = create_cvar(                         "amx_matter_bridge_host",                               "localhost",                                            FCVAR_PROTECTED,                                    "Host of where the bridge is located.");
+    g_cvarBridgePort = create_cvar(                         "amx_matter_bridge_port",                               "1337",                                                 FCVAR_PROTECTED,                                    "Port of where the bridge is located.");
+    g_cvarBridgeGateway = create_cvar(                      "amx_matter_bridge_gateway",                            g_szGamename,                                           FCVAR_PROTECTED,                                    "Gateway name to connect.");
+    g_cvarToken = create_cvar(                              "amx_matter_bridge_token",                              "",                                                     FCVAR_PROTECTED,                                    "String token to authenticate, it's recommended that you set it up, but it will accept any connection by default.");
+    g_cvarIncoming = create_cvar(                           "amx_matter_bridge_incoming",                           "1",                                                    FCVAR_NONE,                                         "Enables incoming messages (protocols to server).");
+    g_cvarIncoming_DontColorize = create_cvar(              "amx_matter_bridge_incoming_dont_colorize",             "0",                                                    FCVAR_NONE,                                         "For incoming messages and games like Counter-Strike and Day of Defeat only. By default it will colorize any message with a simple format (green username) but if set to 1 it will not colorize anything, leaving the admin to handle any colorization in the matterbridge.toml file.");
+    g_cvarIncoming_IgnorePrefix = create_cvar(              "amx_matter_bridge_incoming_ignore_prefix",             "!",                                                    FCVAR_NONE,                                         "For incoming messages. Messages matching this in the beggining of the message will be ignored by the plugin");
+    g_cvarIncoming_RefreshTime = create_cvar(               "amx_matter_bridge_incoming_update_time",               "3.0",                                                  FCVAR_NONE,                                         "For incoming messages. Specifies how many seconds it has to wait before querying new incoming messages. Performance wise is tricky, lower values mean the messages will be queried instantly, while higher values will wait and bring all messages at once, both cases may cause overhead. Experiment and see what's ideal for your server.");
+    g_cvarUseRelayUser = create_cvar(                       "amx_matter_bridge_incoming_relay_user",                "0",                                                    FCVAR_NONE,                                         "For incoming messages. Determines if incoming messages should use an active player as a relay. It will make usernames to display as color in games like Half-Life Deathmatch and The Specialists. This value is ignored in games like Counter-Strike and Day of Defeat.");
+    g_cvarOutgoing = create_cvar(                           "amx_matter_bridge_outgoing",                           "1",                                                    FCVAR_NONE,                                         "Enables outgoing messages (server to protocols).");
+    g_cvarOutgoing_SystemUsername = create_cvar(            "amx_matter_bridge_outgoing_system_username",           sServername,                                            FCVAR_NONE,                                         "For outgoing messages. Name of the 'user' when relying system messages.");
+    g_cvarOutgoing_Chat_Mode = create_cvar(                 "amx_matter_bridge_outgoing_chat_mode",                 "3",                                                    FCVAR_NONE,                                         "For outgoing messages. Select which chat messages you want to send. (1=All chat 2=Team chat) You must sum the values you want to send. For example, if you want to send everything the value must be 3.");
+    g_cvarOutgoing_Chat_SpamFil = create_cvar(              "amx_matter_bridge_outgoing_chat_no_repeat",            "1",                                                    FCVAR_NONE,                                         "For outgoing messages. Implement basic anti-spam filter. Useful for preventing taunt binds from sending multiple times.");
+    g_cvarOutgoing_Chat_ZeroifyAtSign = create_cvar(        "amx_matter_bridge_outgoing_chat_zwsp_at",              "1",                                                    FCVAR_NONE,                                         "For outgoing messages. This controls if the plugin should add a ZWSP character after the at symbol (@) to prevent unintentional or malicious pinging.");
+    g_cvarOutgoing_Chat_RequirePrefix = create_cvar(        "amx_matter_bridge_outgoing_chat_require_prefix",       "",                                                     FCVAR_NONE,                                         "For outgoing messages. Messages need this prefix to be able to be sent. Regex compatible.");
+    g_cvarOutgoing_Chat_MuteServer = create_cvar(           "amx_matter_bridge_outgoing_chat_mute_server",          "0",                                                    FCVAR_NONE,                                         "For outgoing messages. When an user talks (and the message goes through the bridge) it will not be sent to other players. Works better with 'amx_matter_bridge_outgoing_chat_require_prefix' enabled.");
+    g_cvarOutgoing_Kills = create_cvar(                     "amx_matter_bridge_outgoing_kills",                     "1",                                                    FCVAR_NONE,                                         "For outgoing messages. Transmit kill feed. It's recommended that you to turn it off on heavy activity servers (Like CSDM/Half-Life servers with tons of players).");
+    g_cvarOutgoing_Join = create_cvar(                      "amx_matter_bridge_outgoing_join",                      "1",                                                    FCVAR_NONE,                                         "For outgoing messages. Transmit when people join the server.");
+    g_cvarOutgoing_Join_Delay = create_cvar(                "amx_matter_bridge_outgoing_join_delay",                "15",                                                   FCVAR_NONE,                                         "For outgoing messages. Specify how many seconds the server has to wait before sending Join messages.");
+    g_cvarOutgoing_Quit = create_cvar(                      "amx_matter_bridge_outgoing_quit",                      "1",                                                    FCVAR_NONE,                                         "For outgoing messages. Transmit when people leave the server.");
+    g_cvarOutgoing_Quit_IgnoreIntermission = create_cvar(   "amx_matter_bridge_outgoing_quit_ignore_intermission",  "0",                                                    FCVAR_NONE,                                         "For outgoing messages. Specify if the server shouldn't send quit messages if the server reached the intermission state (End of the Map).");
+    g_cvarOutgoing_StripColors = create_cvar(               "amx_matter_bridge_outgoing_strip_colors",              "1",                                                    FCVAR_NONE,                                         "For outgoing messages. Strip color codes from player names. It will only affect Half-Life and Adrenaline Gamer. No effect in other games.");
+    g_cvarOutgoing_DisplayMap = create_cvar(                "amx_matter_bridge_outgoing_display_map",               "1",                                                    FCVAR_NONE,                                         "For outgoing messages. Display the current map at the start of every session.");
+    g_cvarOutgoing_JoinQuit_ShowCount = create_cvar(        "amx_matter_bridge_outgoing_joinquit_count",            "1",                                                    FCVAR_NONE,                                         "For outgoing messages. Display playercount on each Join/Quit message. No effect if both amx_matter_bridge_outgoing_quit and amx_matter_bridge_outgoing_join are 0.");
+    g_cvarForcePrefix = create_cvar(                        "amx_matter_bridge_force_prefix",                       "",                                                     FCVAR_NONE,                                         "For messages displayed in the in-game chat, the value of this cvar will be always prefixed before the username.");
+    g_cvarRetry_Delay = create_cvar(                        "amx_matter_bridge_retry_delay",                        "3.0",                                                  FCVAR_NONE,                                         "In seconds, how long the server has wait before retrying a connection when it was interrupted.");
 
-    g_cvarEnabled = create_cvar("amx_matter_enable", "1", FCVAR_NONE, "Determines if MatterAMXX should be enabled.", true, 0.0, true, 1.0);
-    g_cvarSystemAvatarUrl = create_cvar("amx_matter_system_avatar", "", FCVAR_PROTECTED, "Determines the URL to be used as a system avatar on platforms that support it");
-    g_cvarAutogenAvatarUrl = create_cvar("amx_matter_autogenerate_avatar", "https://robohash.org/%s.png?set=set4", FCVAR_PROTECTED, "");
-    g_cvarAvatarUrl = create_cvar("amx_matter_player_avatar", "http://yourhost/avatars/get_avatar.php?steamid=%s", FCVAR_PROTECTED, "");
-    g_cvarBridgeProtocol = create_cvar("amx_matter_bridge_protocol", "http", FCVAR_PROTECTED);
-    g_cvarBridgeHost = create_cvar("amx_matter_bridge_host", "localhost", FCVAR_PROTECTED);
-    g_cvarBridgePort = create_cvar("amx_matter_bridge_port", "1337", FCVAR_PROTECTED);
-    g_cvarDeprecatedBridgeUrl = create_cvar("amx_matter_bridge_url", "", FCVAR_PROTECTED);
-    g_cvarBridgeGateway = create_cvar("amx_matter_bridge_gateway", g_szGamename, FCVAR_PROTECTED);
-    g_cvarToken = create_cvar("amx_matter_bridge_token", "", FCVAR_PROTECTED);
-    g_cvarIncoming = create_cvar("amx_matter_bridge_incoming", "1");
-    g_cvarIncoming_DontColorize = create_cvar("amx_matter_bridge_incoming_dont_colorize", "0");
-    g_cvarIncoming_IgnorePrefix = create_cvar("amx_matter_bridge_incoming_ignore_prefix", "!");
-    g_cvarIncoming_RefreshTime = create_cvar("amx_matter_bridge_incoming_update_time", "3.0");
-    g_cvarUseRelayUser = create_cvar("amx_matter_bridge_incoming_relay_user", "0", FCVAR_PROTECTED);
-    g_cvarOutgoing = create_cvar("amx_matter_bridge_outgoing", "1");
-    g_cvarOutgoing_SystemUsername = create_cvar("amx_matter_bridge_outgoing_system_username", sServername);
-    g_cvarOutgoing_Chat_Mode = create_cvar("amx_matter_bridge_outgoing_chat_mode", "3");
-    g_cvarOutgoing_Chat_SpamFil = create_cvar("amx_matter_bridge_outgoing_chat_no_repeat", "1");
-    g_cvarOutgoing_Chat_ZeroifyAtSign = create_cvar("amx_matter_bridge_outgoing_chat_zwsp_at", "1");
-    g_cvarOutgoing_Chat_RequirePrefix = create_cvar("amx_matter_bridge_outgoing_chat_require_prefix", "0");
-    g_cvarOutgoing_Chat_MuteServer = create_cvar("amx_matter_bridge_outgoing_chat_mute_server", "0");
-    g_cvarOutgoing_Chat_CopyBack = create_cvar("amx_matter_bridge_outgoing_chat_copyback", "0");
-    g_cvarOutgoing_Kills = create_cvar("amx_matter_bridge_outgoing_kills", "1");
-    g_cvarOutgoing_Join = create_cvar("amx_matter_bridge_outgoing_join", "1");
-    g_cvarOutgoing_Join_Delay = create_cvar("amx_matter_bridge_outgoing_join_delay", "15");
-    g_cvarOutgoing_Quit = create_cvar("amx_matter_bridge_outgoing_quit", "1");
-    g_cvarOutgoing_Quit_IgnoreIntermission = create_cvar("amx_matter_bridge_outgoing_quit_ignore_intermission", "0");
-    g_cvarOutgoing_StripColors = create_cvar("amx_matter_bridge_outgoing_strip_colors", "1");
-    g_cvarOutgoing_DisplayMap = create_cvar("amx_matter_bridge_outgoing_display_map", "1");
-    g_cvarOutgoing_JoinQuit_ShowCount = create_cvar("amx_matter_bridge_outgoing_joinquit_count", "1");
-    g_cvarRetry_Delay = create_cvar("amx_matter_bridge_retry_delay", "3.0");
+    AutoExecConfig();
+
+    register_cvar("amx_matter_bridge_version", MATTERAMXX_PLUGIN_VERSION, FCVAR_SERVER);
+    g_cvarDeprecatedBridgeUrl = register_cvar("amx_matter_bridge_url", "", FCVAR_PROTECTED | FCVAR_SERVER | FCVAR_UNLOGGED);
 
     if(g_hCurrentGame != GAME_SVENCOOP)
     {
@@ -310,7 +317,6 @@ public plugin_init()
         bind_pcvar_num(g_cvarOutgoing_Chat_ZeroifyAtSign, g_bOutgoingZwspAt);
         bind_pcvar_string(g_cvarOutgoing_Chat_RequirePrefix, g_szOutgoingRequirePrefix, charsmax(g_szOutgoingRequirePrefix));
         bind_pcvar_num(g_cvarOutgoing_Chat_MuteServer, g_bOutgoingMuteServer);
-        bind_pcvar_string(g_cvarOutgoing_Chat_CopyBack, g_szOutgoingCopyBack, charsmax(g_szOutgoingCopyBack));
         bind_pcvar_num(g_cvarOutgoing_Kills, g_bOutgoingKills);
         bind_pcvar_num(g_cvarOutgoing_Join, g_bOutgoingJoin);
         bind_pcvar_float(g_cvarOutgoing_Join_Delay, g_fOutgoingJoinDelay);
@@ -319,6 +325,7 @@ public plugin_init()
         bind_pcvar_num(g_cvarOutgoing_StripColors, g_bOutgoingStripColors);
         bind_pcvar_num(g_cvarOutgoing_DisplayMap, g_bOutgoingDisplayMap);
         bind_pcvar_num(g_cvarOutgoing_JoinQuit_ShowCount, g_bOutgoingJoinQuitPlayerCount);
+        bind_pcvar_string(g_cvarForcePrefix, g_szForcePrefix, charsmax(g_szForcePrefix));
         bind_pcvar_float(g_cvarRetry_Delay, g_fRetryDelay);
     }
 
@@ -327,11 +334,9 @@ public plugin_init()
     //TS and SC don't support rendering % 
     if(g_hCurrentGame == GAME_SPECIALISTS || g_hCurrentGame == GAME_SVENCOOP)
         register_dictionary("matteramxx_old.txt");
-
-    register_cvar("amx_matter_bridge_version", MATTERAMXX_PLUGIN_VERSION, FCVAR_SERVER);
 }
 
-public plugin_cfg()
+public OnConfigsExecuted()
 {
     if(g_hCurrentGame == GAME_SVENCOOP)
     {
@@ -358,7 +363,6 @@ public plugin_cfg()
         g_bOutgoingZwspAt = get_pcvar_bool(g_cvarOutgoing_Chat_ZeroifyAtSign);
         get_pcvar_string(g_cvarOutgoing_Chat_RequirePrefix, g_szOutgoingRequirePrefix, charsmax(g_szOutgoingRequirePrefix));
         g_bOutgoingMuteServer = get_pcvar_bool(g_cvarOutgoing_Chat_MuteServer);
-        get_pcvar_string(g_cvarOutgoing_Chat_CopyBack, g_szOutgoingCopyBack, charsmax(g_szOutgoingCopyBack));
         g_bOutgoingKills = get_pcvar_bool(g_cvarOutgoing_Kills);
         g_bOutgoingJoin = get_pcvar_bool(g_cvarOutgoing_Join);
         g_fOutgoingJoinDelay = get_pcvar_float(g_cvarOutgoing_Join_Delay);
@@ -367,6 +371,7 @@ public plugin_cfg()
         g_bOutgoingStripColors = get_pcvar_bool(g_cvarOutgoing_StripColors);
         g_bOutgoingDisplayMap = get_pcvar_bool(g_cvarOutgoing_DisplayMap);
         g_bOutgoingJoinQuitPlayerCount = get_pcvar_bool(g_cvarOutgoing_JoinQuit_ShowCount);
+        get_pcvar_string(g_cvarForcePrefix, g_szForcePrefix, charsmax(g_szForcePrefix));
         g_fRetryDelay = get_pcvar_float(g_cvarRetry_Delay);
     }
 
@@ -415,11 +420,11 @@ public plugin_cfg()
             if(!g_bOutgoingLeaveIgnoreIntermission)
                 register_message(SVC_INTERMISSION, "Event_Intermission");
 
-            replace_all(g_szOutgoingCopyBack, charsmax(g_szOutgoingCopyBack), "!n", "^1");
-            replace_all(g_szOutgoingCopyBack, charsmax(g_szOutgoingCopyBack), "!r", "^3");
-            replace_all(g_szOutgoingCopyBack, charsmax(g_szOutgoingCopyBack), "!b", "^3");
-            replace_all(g_szOutgoingCopyBack, charsmax(g_szOutgoingCopyBack), "!g", "^4");
-            replace_all(g_szOutgoingCopyBack, charsmax(g_szOutgoingCopyBack), "!t", TEAM_COLOR_PLACEHOLDER);
+            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!n", "^1");
+            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!r", "^3");
+            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!b", "^3");
+            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!g", "^4");
+            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!t", TEAM_COLOR_PLACEHOLDER);
         }
         
         if(g_bIncomingMessages)
@@ -662,10 +667,10 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
                 replace_all(szUserName, charsmax(szUserName), "!r", "^3");
                 replace_all(szUserName, charsmax(szUserName), "!b", "^3");
                 replace_all(szUserName, charsmax(szUserName), "!g", "^4");
-                replace_all(g_szOutgoingCopyBack, charsmax(g_szOutgoingCopyBack), "!t", TEAM_COLOR_PLACEHOLDER);
+                replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!t", TEAM_COLOR_PLACEHOLDER);
 
-                if(strlen(g_szOutgoingCopyBack) > 0)
-                    formatex(szMessageNew, charsmax(szMessageNew), g_bIncomingDontColorize ? "%s %s^1: %s" : "^4%s %s^1: %s", g_szOutgoingCopyBack, szUserName, szMessage);
+                if(strlen(g_szForcePrefix) > 0)
+                    formatex(szMessageNew, charsmax(szMessageNew), g_bIncomingDontColorize ? "%s %s^1: %s" : "^4%s %s^1: %s", g_szForcePrefix, szUserName, szMessage);
                 else
                     formatex(szMessageNew, charsmax(szMessageNew), "%s^1: %s", szUserName, szMessage);
 
@@ -687,8 +692,8 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
                 else
                 {
                     //so far all goldsrc games have the init string control character at the start
-                    if(strlen(g_szOutgoingCopyBack) > 0)
-                        formatex(szMessageNew, charsmax(szMessageNew), "%s %s: %s", g_szOutgoingCopyBack, szUserName, szMessage);
+                    if(strlen(g_szForcePrefix) > 0)
+                        formatex(szMessageNew, charsmax(szMessageNew), "%s %s: %s", g_szForcePrefix, szUserName, szMessage);
                     else
                         formatex(szMessageNew, charsmax(szMessageNew), "%s: %s", szUserName, szMessage);
                     
@@ -796,8 +801,8 @@ public PrintRelayUser_Post(const szMessage[], iTaskId)
     get_user_name(iClient, szUserName, charsmax(szUserName));
     new szMessageNew[MESSAGE_LENGTH];
 
-    if(strlen(g_szOutgoingCopyBack) > 0)
-        formatex(szMessageNew, charsmax(szMessageNew), "^2%s %s: %s", g_szOutgoingCopyBack, szUserName, szMessage);
+    if(strlen(g_szForcePrefix) > 0)
+        formatex(szMessageNew, charsmax(szMessageNew), "^2%s %s: %s", g_szForcePrefix, szUserName, szMessage);
     else
         formatex(szMessageNew, charsmax(szMessageNew), "^2%s: %s", szUserName, szMessage);
 
@@ -960,7 +965,7 @@ public Event_SayMessage(iClient)
     else
     {
         new szMessageNew[MESSAGE_LENGTH];
-        if(strlen(g_szOutgoingCopyBack) == 0)
+        if(strlen(g_szForcePrefix) == 0)
         {
             if(g_bOutgoingMuteServer)
             {
@@ -978,12 +983,12 @@ public Event_SayMessage(iClient)
         {
             if(cstrike_running())
             {
-                formatex(szMessageNew, charsmax(szMessageNew), "%s %s%s%s: %s", g_szOutgoingCopyBack, 0 < iClient && iClient <= MAX_PLAYERS ? "^3" : "^4", szUserName, cstrike_running() ? "^1" : "", szMessage);
+                formatex(szMessageNew, charsmax(szMessageNew), "%s %s%s%s: %s", g_szForcePrefix, 0 < iClient && iClient <= MAX_PLAYERS ? "^3" : "^4", szUserName, cstrike_running() ? "^1" : "", szMessage);
                 client_print_color(g_bOutgoingMuteServer ? iClient : 0, iClient, szMessageNew);
             }
             else
             {
-                formatex(szMessageNew, charsmax(szMessageNew), "%s %s%s: %s", g_szOutgoingCopyBack, szUserName, cstrike_running() ? "^1" : "", szMessage);
+                formatex(szMessageNew, charsmax(szMessageNew), "%s %s%s: %s", g_szForcePrefix, szUserName, cstrike_running() ? "^1" : "", szMessage);
                 client_print(g_bOutgoingMuteServer ? iClient : 0, print_chat, szMessageNew);
             }
         }
