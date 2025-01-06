@@ -231,6 +231,9 @@ public plugin_natives()
 
 public plugin_init()
 {
+    //always compile regex on map init to avoid errors
+    g_rAuthId_Pattern = regex_compile(REGEX_STEAMID_PATTERN);
+    
     register_plugin(MATTERAMXX_PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR);
 
     new sServername[MAX_NAME_LENGTH];
@@ -399,8 +402,6 @@ public OnConfigsExecuted()
                     register_clcmd("say", "Event_SayMessage");
                 if(g_iOutgoingChatMode & CHAT_TYPE_TEAM)
                     register_clcmd("say_team", "Event_SayMessage");
-                    
-                g_rAuthId_Pattern = regex_compile(REGEX_STEAMID_PATTERN);
             }
 
             if(g_bOutgoingKills)
@@ -449,9 +450,6 @@ public OnConfigsExecuted()
 
             if(!empty(g_szIncomingIgnorePrefix))
                 g_rPrefix_Pattern = regex_compile(g_szIncomingIgnorePrefix);
-
-            if(!g_rAuthId_Pattern)
-                g_rAuthId_Pattern = regex_compile(REGEX_STEAMID_PATTERN);
         }
 
         if(g_bIncomingRelayMessagesOnUser && g_hCurrentGame != GAME_CSTRIKE && g_hCurrentGame != GAME_CZERO && g_hCurrentGame != GAME_DOD)
