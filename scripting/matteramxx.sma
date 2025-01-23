@@ -1,7 +1,7 @@
 #include <amxmodx>
 
 #if AMXX_VERSION_NUM < 183
-#assert "AMX Mod X versions 1.8.2 and below are not supported. Please upgrade your shit."
+#assert "AMX Mod X versions 1.8.2 and below are not supported."
 #endif
 
 // ** COMPILER OPTIONS **
@@ -9,20 +9,22 @@
 
 // Enable if you want to use HamSandwich (recommended)
 // Disable if you want to use DeathMsg, for example in games that do not have HamSandwich support like Ricochet
+// Useful in: Ricochet and mods with no virtual table data
 #define USE_HAMSANDWICH 1
 
-// Enable if you want to enable disconnect messages on Sven Co-op
-// SC 5.6 removed DWARF information, making the usage of client_disconnected() impossible until the signature is found
-// This makes the plugin use the deprecated client_disconnect() forward and WILL cause a warning on compilation, but can be safely ignored
-#define SVENCOOP_LEAVE_SUPPORT 0
+// Enable if you want to use the deprecated `client_disconnect()` forward instead of the newer `client_disconnected()`
+// Useful in engines where there are no signature for the newer forward yet
+// This WILL cause a warning on compilation, but can be safely ignored
+// Useful in: Bleeding edge versions of Svengine
+#define USE_DEPRECATED_DISCONNECT_FORWARD 0
 // Did you know pawn supports a warning disable pragma but it was removed from AMX?
 // Yet they use the warning disable pragma in C when they compile AMXX bins?
 // Crazy right?
 
 // Enable if you want to use experimental extended string buffers, most of the time you won't need it
-// You may enable this if you have problems with messages (Messages cutting themselves short) to see if it works better
 // Note that this will cause the plugin to use more memory
-#define USE_EXTENDED_BUFFER 0
+// Useful in: cases where messages are getting truncated
+#define USE_EXTENDED_BUFFER 1
 
 // ** COMPILER OPTIONS END HERE **
 
@@ -258,7 +260,7 @@ public plugin_init()
 
     get_cvar_string("hostname", sServername, charsmax(sServername));
 
-    g_cvarEnabled = create_cvar(                            "amx_matter_enable",                                    "1",                                                    FCVAR_NONE,                                         "Determines if MatterAMXX should be enabled.", true, 0.0, true, 1.0);
+    g_cvarEnabled = create_cvar(                            "amx_matter_enable",                                    "1",                                                    FCVAR_NONE,                                         "Determines if MatterAMXX should be enabled.");
     g_cvarSystemAvatarUrl = create_cvar(                    "amx_matter_system_avatar",                             "",                                                     FCVAR_PROTECTED,                                    "URL pointing to a picture that will be used as avatar image in system messages (In protocols that support it).");
     g_cvarAutogenAvatarUrl = create_cvar(                   "amx_matter_autogenerate_avatar",                       "https://robohash.org/%s.png?set=set4",                 FCVAR_PROTECTED,                                    "URL pointing to a picture that will be used as avatar image in unauthenticated player messages (In protocols that support it).");
     g_cvarAvatarUrl = create_cvar(                          "amx_matter_player_avatar",                             "http://yourhost/avatars/get_avatar.php?steamid=%s",    FCVAR_PROTECTED,                                    "URL pointing to a picture that will be used as avatar image in player messages (In protocols that support it), note that this is dynamic based on the user's Steam ID64, if it can't be retrieved the message will use unauthenticated avatars.");
@@ -297,7 +299,7 @@ public plugin_init()
 
     if(g_hCurrentGame != GAME_SVENCOOP)
     {
-        //sven co-op removed signatures required to hook into the cvar changing method
+        //sven co-op at the time of writing crashes hooks into the cvar changing
         bind_pcvar_num(g_cvarEnabled, g_bEnabled);
         bind_pcvar_string(g_cvarSystemAvatarUrl, g_szSystemAvatarUrl, charsmax(g_szSystemAvatarUrl));
         bind_pcvar_string(g_cvarAutogenAvatarUrl, g_szAutogenAvatarUrl, charsmax(g_szAutogenAvatarUrl));
@@ -729,7 +731,7 @@ public ProcessMessageQueue()
         new aData[aMessageQueueStruct];
         ArrayGetArray(g_aMessageQueue, iIndex, aData);
 
-        new szUserName[MAX_NAME_LENGTH], szMessage[MAX_NAME_LENGTH], iClient;
+        new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH], iClient;
 
         copy(szUserName, charsmax(szUserName), aData[szMessageQueueName]);
         copy(szMessage, charsmax(szMessage), aData[szMessageQueueMessage]);
@@ -757,7 +759,7 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
     if(iClient == 0)
     {
         // we need to use a player as a relay to preserve correct text rendering
-        iClient = get_any_non_bot_player();
+        iClient = GetAnyPlayer();
         
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
             server_print("[DEBUG] matteramxx.amxx::PrintRelayUser() - Renaming client %d to %s", iClient, szNewUserName);
@@ -767,7 +769,7 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
         set_user_info(iClient, "name", szNewUserName);
 
         // we need to wait for the name change to propagate to clients
-        set_task(floatmax(get_highest_ping()/1000.0, 0.1), "PrintRelayUser_Post", FAKEBOT_TASK_ID+iClient, szMessage, MESSAGE_LENGTH);
+        set_task(floatmax(GetHighestPing()/1000.0, 0.1), "PrintRelayUser_Post", FAKEBOT_TASK_ID+iClient, szMessage, MESSAGE_LENGTH);
     }
     else
     {
@@ -827,7 +829,7 @@ public PrintRelayUser_Post(const szMessage[], iTaskId)
     if(bInstant)
         PrintRelayUser_Post(szMessage, FAKEBOT_TASK_ID+iClient);
     else
-        set_task(floatmax(get_highest_ping()/1000.0, 0.1), "ChangeNameBack", FAKEBOT_TASK_ID_POST+iClient);
+        set_task(floatmax(GetHighestPing()/1000.0, 0.1), "ChangeNameBack", FAKEBOT_TASK_ID_POST+iClient);
 }
 
 public ChangeNameBack(iTaskId)
@@ -1098,7 +1100,7 @@ public client_authorized(id)
         g_bUserAuthenticated[id] = 1;
 }
 
-#if SVENCOOP_LEAVE_SUPPORT
+#if USE_DEPRECATED_DISCONNECT_FORWARD
 public client_disconnect(iClient)
 {
     if(g_hCurrentGame == GAME_SVENCOOP)
@@ -1177,6 +1179,41 @@ public client_putinserver(id)
 
         send_message_rest(gJson, g_szGateway);
     }
+}
+
+GetAnyPlayer()
+{
+    for(new iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        // The Specialists doesn't like when a bot sends a message
+        if(is_user_connected(iClient) && (g_hCurrentGame != GAME_SPECIALISTS || (g_hCurrentGame == GAME_SPECIALISTS && !is_user_bot(iClient))))
+            return iClient;
+    }
+
+    return 0;
+}
+
+GetHighestPing()
+{
+    new iMaxPing = 1; //error margin
+    for(new iClient = 1; iClient <= MaxClients; iClient++)
+    {
+        if(is_user_connected(iClient) && !is_user_bot(iClient))
+        {
+            new iUserPing = 0;
+            new iUserLoss = 0;
+            get_user_ping(iClient, iUserPing, iUserLoss);
+            if(iUserPing > iMaxPing)
+                iMaxPing = iUserPing;
+        }
+    
+    }
+    return iMaxPing;
+}
+
+stock empty(const string[])
+{
+    return !string[0];
 }
 
 //thanks to YaLTeR
@@ -1269,38 +1306,4 @@ stock is_valid_authid(authid[])
 stock prefix_matches(const message[]) 
 {
     return regex_match_c(message, g_rPrefix_Pattern) > 0;
-}
-
-stock empty(const string[])
-{
-    return !string[0];
-}
-
-stock get_any_non_bot_player()
-{
-    for(new iClient = 1; iClient <= MaxClients; iClient++)
-    {
-        if(is_user_connected(iClient) && !is_user_bot(iClient))
-            return iClient;
-    }
-
-    return 0;
-}
-
-stock get_highest_ping()
-{
-    new iMaxPing = 1; //error margin
-    for(new iClient = 1; iClient <= MaxClients; iClient++)
-    {
-        if(is_user_connected(iClient) && !is_user_bot(iClient))
-        {
-            new iUserPing = 0;
-            new iUserLoss = 0;
-            get_user_ping(iClient, iUserPing, iUserLoss);
-            if(iUserPing > iMaxPing)
-                iMaxPing = iUserPing;
-        }
-    
-    }
-    return iMaxPing;
 }
