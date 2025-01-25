@@ -153,7 +153,7 @@ new bool:g_bOutgoingNoRepeat = false;
 new bool:g_bOutgoingZwspAt = false;
 new g_szOutgoingRequirePrefix[SHORT_LENGTH];
 new bool:g_bOutgoingMuteServer = false;
-new g_szForcePrefix[SHORT_LENGTH];
+new g_szForcePrefix[MAX_NAME_LENGTH];
 new bool:g_bOutgoingKills = false;
 new bool:g_bOutgoingJoin = false;
 new Float:g_fOutgoingJoinDelay = 0.0;
@@ -641,12 +641,22 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
     new iReturnVal = 0;
     new szMessageNew[MESSAGE_LENGTH];
     ExecuteForward(g_hPrintMessageForward, iReturnVal, szMessage, szUserName, szProtocol, szUserIdentifier);
+
+    if(g_iPluginFlags & AMX_FLAG_DEBUG)
+        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - iReturnVal is %d", iReturnVal);
+
     switch(iReturnVal)
     {
         case 0:
         {
+            if(g_iPluginFlags & AMX_FLAG_DEBUG)
+                server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - Check prefix value");
+
             if(prefix_matches(szMessage))
                 return;
+
+            if(g_iPluginFlags & AMX_FLAG_DEBUG)
+                server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - Not returning");
 
             if(empty(szUserName))
                 copy(szUserName, charsmax(szUserName), g_szOutgoingSystemUsername);
@@ -681,13 +691,18 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
             }
             else  
             {
+                if(g_iPluginFlags & AMX_FLAG_DEBUG)
+                    server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - Not Counter-Strike");
+
                 // counter strike is not running, so we wouldn't have colors even if we wanted them
                 // 2022 Update: it's possible to get colors in games that are not CS or DOD
                 // we just need an overly complicated hack
                 if(g_bIncomingRelayMessagesOnUser)
                 {
+                    if(g_iPluginFlags & AMX_FLAG_DEBUG)
+                        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - g_bIncomingRelayMessagesOnUser");
                     //we need to create a message queue, otherwise race conditions might occur
-                    AddMessageToRelayQueue(szMessage, szUserName, OUTSIDER);
+                    AddMessageToRelayQueue(szMessage, szUserName);
                 }
                 else
                 {
@@ -708,12 +723,12 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
     }  
 }
 
-public AddMessageToRelayQueue(const szMessage[], const szUserName[], const iClient)
+AddMessageToRelayQueue(const szMessage[], const szUserName[], const iClient = 0)
 {
     new aMessageData[aMessageQueueStruct];
     copy(aMessageData[szMessageQueueName], charsmax(aMessageData), szUserName);
     copy(aMessageData[szMessageQueueMessage], charsmax(aMessageData), szMessage);
-    aMessageData[iMessageQueueClient] = 0;
+    aMessageData[iMessageQueueClient] = iClient;
     ArrayPushArray(g_aMessageQueue, aMessageData);
 
     if(!g_bProcessingMessageQueue)
@@ -740,11 +755,11 @@ public ProcessMessageQueue()
         PrintRelayUser(szMessage, szUserName, iClient);
 
         ArrayDeleteItem(g_aMessageQueue, iIndex);
+
+        ProcessMessageQueue();
     }
     else
-    {
         g_bProcessingMessageQueue = false;
-    }
 }
 
 PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
@@ -826,9 +841,7 @@ public PrintRelayUser_Post(const szMessage[], iTaskId)
     server_print(szMessageNew);
 
     //ditto, we need to wait for propagation if we used a player and not self
-    if(bInstant)
-        PrintRelayUser_Post(szMessage, FAKEBOT_TASK_ID+iClient);
-    else
+    if(!bInstant)
         set_task(floatmax(GetHighestPing()/1000.0, 0.1), "ChangeNameBack", FAKEBOT_TASK_ID_POST+iClient);
 }
 
