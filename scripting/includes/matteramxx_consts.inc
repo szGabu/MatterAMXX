@@ -17,6 +17,8 @@
 
 #pragma dynamic 65536
 
+#define MATTERAMXX_PLUGIN_NAME      "MatterAMXX"
+#define MATTERAMXX_PLUGIN_AUTHOR    "szGabu"
 #define MATTERAMXX_PLUGIN_VERSION   "1.6.0-25w17a"
 
 enum {
