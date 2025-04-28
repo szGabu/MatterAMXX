@@ -35,14 +35,6 @@
 #include <matteramxx_consts>
 #include <grip>
 
-#define SHORT_LENGTH                    16
-#define REGEX_STEAMID_PATTERN           "^^STEAM_(0|1):(0|1):\d+$"
-#define SYSMES_ID                       "0xDEADBEEF"
-#define FAKEBOT_TASK_ID                 3526373
-#define FAKEBOT_TASK_ID_POST            5774157
-#define TEAM_COLOR_PLACEHOLDER          "$%&/"
-#define OUTSIDER                        0
-
 #pragma semicolon 1
 
 enum
