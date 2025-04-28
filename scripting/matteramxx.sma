@@ -375,7 +375,7 @@ public OnConfigsExecuted()
             g_hPrintMessageForward = CreateMultiForward("matteramxx_print_message", ET_STOP, FP_STRING, FP_STRING, FP_STRING, FP_STRING);
 
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                server_print("[DEBUG] matteramxx.amxx::plugin_cfg() - g_fIncomingUpdateTime is %f", g_fIncomingUpdateTime);
+                server_print("[DEBUG] %s::plugin_cfg() - g_fIncomingUpdateTime is %f", __BINARY__, g_fIncomingUpdateTime);
 
             set_task(g_fIncomingUpdateTime, "MatterConnectAPI");
 
@@ -445,7 +445,7 @@ public Event_Intermission()
 public MatterConnectAPI()
 {
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] matteramxx.amxx::MatterConnectAPI() - Called");
+        server_print("[DEBUG] %s::MatterConnectAPI() - Called", __BINARY__);
 
     g_gripIncomingHandle = grip_request(g_szIncomingUri, Empty_GripBody, GripRequestTypeGet, "MatterIncomingMessage", g_gIncomingHeader);
 }
@@ -453,7 +453,7 @@ public MatterConnectAPI()
 public MatterRetryConnection()
 {
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] matteramxx.amxx::MatterRetryConnection() - Called");
+        server_print("[DEBUG] %s::MatterRetryConnection() - Called", __BINARY__);
 
     server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_RETRYING", floatround(g_fRetryDelay));
     set_task(g_fRetryDelay, "MatterConnectAPI");
@@ -462,7 +462,7 @@ public MatterRetryConnection()
 public MatterIncomingMessage()
 {
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] matteramxx.amxx::MatterIncomingMessage() - Called");
+        server_print("[DEBUG] %s::MatterIncomingMessage() - Called", __BINARY__);
 
     if(grip_get_response_state() != GripResponseStateSuccessful)
     {
@@ -482,7 +482,7 @@ public MatterIncomingMessage()
     if(!empty(sJsonError))
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
-            server_print("[DEBUG] matteramxx.amxx::MatterIncomingMessage() - Json Error");
+            server_print("[DEBUG] %s::MatterIncomingMessage() - Json Error", __BINARY__);
 
         server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_INVALID");
         set_task(g_fRetryDelay, "MatterConnectAPI");
@@ -539,7 +539,7 @@ public Event_RelayUserChangeName(msgid, dest, receiver)
     //     copy(szDebugMessage, charsmax(szDebugMessage), szMessage);
     //     for(new i=0; i < sizeof(szDebugMessage);i++)
     //     {
-    //         server_print("[DEBUG] matteramxx.amxx::Event_RelayUserChangeName() - %d", szDebugMessage[i]);
+    //         server_print("[DEBUG] %s::Event_RelayUserChangeName() - %d", __BINARY__, szDebugMessage[i]);
     //     }
         
     // }
@@ -554,11 +554,11 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
 {
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
     {
-        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - Called");
-        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szMessage is %s", szMessage);
-        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szUserName is %s", szUserName);
-        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szProtocol is %s", szProtocol);
-        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szUserIdentifier is %s", szUserIdentifier);
+        server_print("[DEBUG] %s::MatterPrintMessage() - Called", __BINARY__);
+        server_print("[DEBUG] %s::MatterPrintMessage() - szMessage is %s", __BINARY__, szMessage);
+        server_print("[DEBUG] %s::MatterPrintMessage() - szUserName is %s", __BINARY__, szUserName);
+        server_print("[DEBUG] %s::MatterPrintMessage() - szProtocol is %s", __BINARY__, szProtocol);
+        server_print("[DEBUG] %s::MatterPrintMessage() - szUserIdentifier is %s", __BINARY__, szUserIdentifier);
     }
 
     new iReturnVal = 0;
@@ -566,20 +566,20 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
     ExecuteForward(g_hPrintMessageForward, iReturnVal, szMessage, szUserName, szProtocol, szUserIdentifier);
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - iReturnVal is %d", iReturnVal);
+        server_print("[DEBUG] %s::MatterPrintMessage() - iReturnVal is %d", __BINARY__, iReturnVal);
 
     switch(iReturnVal)
     {
         case 0:
         {
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - Check prefix value");
+                server_print("[DEBUG] %s::MatterPrintMessage() - Check prefix value", __BINARY__);
 
             if(prefix_matches(szMessage))
                 return;
 
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - Not returning");
+                server_print("[DEBUG] %s::MatterPrintMessage() - Not returning", __BINARY__);
 
             if(empty(szUserName))
                 copy(szUserName, charsmax(szUserName), g_szOutgoingSystemUsername);
@@ -608,14 +608,14 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
                     formatex(szMessageNew, charsmax(szMessageNew), "%s^1: %s", szUserName, szMessage);
 
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                    server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - szMessageNew %s", szMessageNew);
+                    server_print("[DEBUG] %s::MatterPrintMessage() - szMessageNew %s", __BINARY__, szMessageNew);
 
                 client_print_color(0, is_red ? print_team_red : print_team_blue, szMessageNew); 
             }
             else  
             {
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                    server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - Not Counter-Strike");
+                    server_print("[DEBUG] %s::MatterPrintMessage() - Not Counter-Strike", __BINARY__);
 
                 // counter strike is not running, so we wouldn't have colors even if we wanted them
                 // 2022 Update: it's possible to get colors in games that are not CS or DOD
@@ -623,7 +623,7 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
                 if(g_bIncomingRelayMessagesOnUser)
                 {
                     if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                        server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - g_bIncomingRelayMessagesOnUser");
+                        server_print("[DEBUG] %s::MatterPrintMessage() - g_bIncomingRelayMessagesOnUser", __BINARY__);
                     //we need to create a message queue, otherwise race conditions might occur
                     PrintRelayUser(szMessage, szUserName);
                 }
@@ -666,7 +666,7 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
             bShouldRevertName = true;
             
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                server_print("[DEBUG] matteramxx.amxx::PrintRelayUser() - Renaming client %d to %s", iClient, szFixedUserName);
+                server_print("[DEBUG] %s::PrintRelayUser() - Renaming client %d to %s", __BINARY__, iClient, szFixedUserName);
 
             get_user_name(iClient, szTemporaryNameBuffer, charsmax(szTemporaryNameBuffer));
             set_user_info(iClient, "name", szFixedUserName);
@@ -746,14 +746,14 @@ public Event_SayMessage(iClient)
         replace_all(szMessage, charsmax(szMessage), "@", "@​");
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - Message ^"%s^" was sent.", szMessage);
+        server_print("[DEBUG] %s::Event_SayMessage() - Message ^"%s^" was sent.", __BINARY__, szMessage);
 
     if(empty(szMessage) || (g_bOutgoingNoRepeat && equal(szMessage, g_szLastMessages[iClient])))
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
         {
-            server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - First condition returned false, returning.");
-            server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - (Message length was %i)", strlen(szMessage));
+            server_print("[DEBUG] %s::Event_SayMessage() - First condition returned false, returning.", __BINARY__);
+            server_print("[DEBUG] %s::Event_SayMessage() - (Message length was %i)", __BINARY__, strlen(szMessage));
         }
         return PLUGIN_CONTINUE;
     }
@@ -764,12 +764,12 @@ public Event_SayMessage(iClient)
     new GripJSONValue:gJson = grip_json_init_object();
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - Preparing gJson object.");
+        server_print("[DEBUG] %s::Event_SayMessage() - Preparing gJson object.", __BINARY__);
     
     if(iClient)
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
-            server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - iClient is %i.", iClient);
+            server_print("[DEBUG] %s::Event_SayMessage() - iClient is %i.", __BINARY__, iClient);
         if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
             get_colorless_name(iClient, szUserName, charsmax(szUserName));
         else
@@ -779,26 +779,26 @@ public Event_SayMessage(iClient)
 
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
         {
-            server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - Fullname is %s.", szUserName);
-            server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - Steam ID is %s.", sSteamId);
+            server_print("[DEBUG] %s::Event_SayMessage() - Fullname is %s.", __BINARY__, szUserName);
+            server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is %s.", __BINARY__, sSteamId);
         }
 
         if(!empty(sSteamId))
         {
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - Steam ID is from a player.");
+                server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is from a player.", __BINARY__);
             new sAvatarUrlFull[TARGET_URL_LENGTH];
             if(g_bUserAuthenticated[iClient])
             {
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                    server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - User is authenticated.");
+                    server_print("[DEBUG] %s::Event_SayMessage() - User is authenticated.", __BINARY__);
                 if(!empty(g_szAvatarUrl))
                     formatex(sAvatarUrlFull, charsmax(sAvatarUrlFull), g_szAvatarUrl, sSteamId);
             }
             else
             {
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                    server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - User not is authenticated.");
+                    server_print("[DEBUG] %s::Event_SayMessage() - User not is authenticated.", __BINARY__);
                 if(!empty(g_szAutogenAvatarUrl))
                 {
                     new sEncodedName[MAX_NAME_LENGTH];
@@ -808,7 +808,7 @@ public Event_SayMessage(iClient)
             }
 
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - Resulting avatar URL is %s.", sAvatarUrlFull);
+                server_print("[DEBUG] %s::Event_SayMessage() - Resulting avatar URL is %s.", __BINARY__, sAvatarUrlFull);
 
             if(!empty(sAvatarUrlFull))
                 grip_json_object_set_string(gJson, "avatar", sAvatarUrlFull);
@@ -816,7 +816,7 @@ public Event_SayMessage(iClient)
         else if(!empty(g_szSystemAvatarUrl))
         {
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - The server sent this message.");
+                server_print("[DEBUG] %s::Event_SayMessage() - The server sent this message.", __BINARY__);
             grip_json_object_set_string(gJson, "avatar", g_szSystemAvatarUrl);
         }
     } 
@@ -826,7 +826,7 @@ public Event_SayMessage(iClient)
     grip_json_object_set_string(gJson, "userid", (iClient) ? sSteamId : "GAME_CONSOLE");
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - I'm going to send the message.");
+        server_print("[DEBUG] %s::Event_SayMessage() - I'm going to send the message.", __BINARY__);
     send_message_rest(gJson, g_szGateway);
 
     if(g_bIncomingRelayMessagesOnUser)
@@ -946,10 +946,10 @@ public outgoing_message()
 {
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
     {
-        server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - I sent the message. Response State is %d", grip_get_response_state());
+        server_print("[DEBUG] %s::Event_SayMessage() - I sent the message. Response State is %d", __BINARY__, grip_get_response_state());
         new sResponse[INCOMING_BUFFER_LENGTH];
         grip_get_response_body_string(sResponse, charsmax(sResponse));
-        server_print("[DEBUG] matteramxx.amxx::Event_SayMessage() - Server said: %s", sResponse);
+        server_print("[DEBUG] %s::Event_SayMessage() - Server said: %s", __BINARY__, sResponse);
     }
 
     if(grip_get_response_state() != GripResponseStateSuccessful)
