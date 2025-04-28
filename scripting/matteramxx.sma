@@ -10,7 +10,7 @@
 // Enable if you want to use HamSandwich (recommended)
 // Disable if you want to use DeathMsg, for example in games that do not have HamSandwich support like Ricochet
 // Useful in: Ricochet and mods with no virtual table data
-#define USE_HAMSANDWICH 1
+#define USE_HAMSANDWICH 0
 
 // Enable if you want to use the deprecated `client_disconnect()` forward instead of the newer `client_disconnected()`
 // Useful in engines where there are no signature for the newer forward yet
