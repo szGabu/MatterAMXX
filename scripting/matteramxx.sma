@@ -21,17 +21,12 @@
 // Yet they use the warning disable pragma in C when they compile AMXX bins?
 // Crazy right?
 
-// Enable if you want to use experimental extended string buffers, most of the time you won't need it
-// Note that this will cause the plugin to use more memory
-// Useful in: cases where messages are getting truncated
-#define USE_EXTENDED_BUFFER 1
-
 // ** COMPILER OPTIONS END HERE **
 
-#if USE_EXTENDED_BUFFER > 0
-    #pragma dynamic 65536
-#else
-    #pragma dynamic 32768
+#include <amxmodx>
+
+#if AMXX_VERSION_NUM < 183
+#assert "AMX Mod X versions 1.8.2 and below are not supported."
 #endif
 
 #include <amxmisc>
@@ -43,42 +38,19 @@
     #include <hamsandwich>
 #endif
 
+#include <matteramxx_consts>
 #include <grip>
 
-#if USE_EXTENDED_BUFFER > 0
-    #define INCOMING_BUFFER_LENGTH      10240
-    #define TARGET_URL_LENGTH           2048
-    #define MESSAGE_LENGTH              1024
-    #define BASE_URL_LENGTH             512
-    #define JSON_PARAMETER_LENGTH       512
-    #define TOKEN_LENGTH                128
-    #define MESSAGE_QUEUE_ENTRIES       128
-#else
-    #define INCOMING_BUFFER_LENGTH      5120
-    #define TARGET_URL_LENGTH           1024
-    #define MESSAGE_LENGTH              512
-    #define BASE_URL_LENGTH             256
-    #define JSON_PARAMETER_LENGTH       256
-    #define TOKEN_LENGTH                64
-    #define MESSAGE_QUEUE_ENTRIES       64
-#endif
-
 #define SHORT_LENGTH                    16
-
 #define REGEX_STEAMID_PATTERN           "^^STEAM_(0|1):(0|1):\d+$"
-
 #define SYSMES_ID                       "0xDEADBEEF"
-
 #define FAKEBOT_TASK_ID                 3526373
 #define FAKEBOT_TASK_ID_POST            5774157
-
-#define MATTERAMXX_PLUGIN_NAME          "MatterAMXX"
-#define MATTERAMXX_PLUGIN_AUTHOR        "szGabu"
-#define MATTERAMXX_PLUGIN_VERSION       "1.6-RC1"
-
 #define TEAM_COLOR_PLACEHOLDER          "$%&/"
-
 #define OUTSIDER                        0
+
+#define MATTERAMXX_PLUGIN_NAME      "MatterAMXX"
+#define MATTERAMXX_PLUGIN_AUTHOR    "szGabu"
 
 #pragma semicolon 1
 

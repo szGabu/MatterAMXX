@@ -8,11 +8,10 @@
 #include <matteramxx>
 #include <regex>
 
-#define MATTERAMXX_PLUGIN_PLUGIN        "MatterAMXX Lag Checker"
-#define MATTERAMXX_PLUGIN_AUTHOR        "szGabu"
-#define MATTERAMXX_PLUGIN_VERSION       "1.6-RC1"
+#define PLUGIN_NAME        "MatterAMXX Lag Checker"
+#define PLUGIN_AUTHOR      "szGabu"
 
-#define REGEX_STATUS                    "LB\s*(\d*\.\d*)\s*\d*\.\d*\s*\d*\.\d*\s*\d*\s*\d*\s*(\d*\.\d*)"
+#define REGEX_STATUS       "LB\s*(\d*\.\d*)\s*\d*\.\d*\s*\d*\.\d*\s*\d*\s*\d*\s*(\d*\.\d*)"
 
 #pragma semicolon 1
 
@@ -30,12 +29,13 @@ new Regex:g_rPattern;
 
 public plugin_init()
 {
-    register_plugin(MATTERAMXX_PLUGIN_PLUGIN, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR);
+    register_plugin(PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, PLUGIN_AUTHOR);
 
     register_clcmd("say", "say_message");
     register_clcmd("say_team", "say_message");
 
     g_cvarEnabled = register_cvar("amx_matter_lagchecker_enabled", "1");
+    g_cvarNotifyEverytime = register_cvar("amx_matter_lagchecker_notify_everytime", "0");
     g_cvarToPing = register_cvar("amx_matter_lagchecker_ping_this_person", "");
     g_cvarSendAllStatus = register_cvar("amx_matter_lagchecker_send_all_status", "0");
     g_cvarCpuThreshold = register_cvar("amx_matter_lagchecker_cpu_threshold", "75");

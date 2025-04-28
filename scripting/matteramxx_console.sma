@@ -27,15 +27,10 @@
 #include <cellarray>
 #include <regex>
 
+#define PLUGIN_NAME                     "MatterAMXX RCON"
+#define PLUGIN_AUTHOR                   "szGabu"
+
 #define MATTERAMXX_CONSOLE_OBEY_FILE    "matteramxx_rcon_accounts.ini"
-#define SERVER_RESPONSE_LENGTH          5120
-#define CVARLIST_TRIES                  6 //cannot be more than 6, inclusive, starts from 0
-#define IP_REGEX                        "((?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){2})((?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9]))"
-#define CVARQUERY_FORMAT                "^"%s^" is ^"%s^"^n"
-#define STATS_FORMAT                    "CPU   In    Out   Uptime  Users   FPS    Players^n%s^n"
-#define MATTERAMXX_PLUGIN_NAME          "MatterAMXX RCON"
-#define MATTERAMXX_PLUGIN_AUTHOR        "szGabu"
-#define MATTERAMXX_PLUGIN_VERSION       "1.6-RC1"
 
 #pragma semicolon 1
 
@@ -75,7 +70,7 @@ new const g_sDangerousCommands[][] = {
 
 public plugin_init()
 {
-    register_plugin(MATTERAMXX_PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR);
+    register_plugin(PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, PLUGIN_AUTHOR);
 
     g_cvarEnabled = register_cvar("amx_matter_rcon_enable", "1");
     g_cvarDontIgnoreObeyTo = register_cvar("amx_matter_rcon_dont_ignore_list", "1"); //DANGEROUS!!
