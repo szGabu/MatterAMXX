@@ -15,14 +15,20 @@
 
 #pragma semicolon 1
 
-new g_cvarEnabled;
-new g_cvarCpuThreshold;
-new g_cvarFpsThreshold;
-new g_cvarSendAllStatus;
-new g_cvarToPing;
-new g_szStats[MESSAGE_LENGTH];
+static g_cvarEnabled;
+static g_cvarComputeThreshold;
+static g_cvarFramesThreshold;
+static g_cvarSendAllStatus;
+static g_cvarToPing;
 
-new g_iPluginFlags;
+static bool:g_bEnabled;
+static g_iComputeThreshold;
+static g_iFramesThreshold;
+static bool:g_bSendAllStatus;
+static g_szToPing[MAX_NAME_LENGTH];
+
+static g_iPluginFlags;
+
 new g_bRestartScheduled = false;
 
 new Regex:g_rPattern;
@@ -31,22 +37,30 @@ public plugin_init()
 {
     register_plugin(PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, PLUGIN_AUTHOR);
 
-    register_clcmd("say", "say_message");
-    register_clcmd("say_team", "say_message");
+    register_clcmd("say", "ClientCommand_Say");
+    register_clcmd("say_team", "ClientCommand_Say");
 
-    g_cvarEnabled = register_cvar("amx_matter_lagchecker_enabled", "1");
-    g_cvarNotifyEverytime = register_cvar("amx_matter_lagchecker_notify_everytime", "0");
-    g_cvarToPing = register_cvar("amx_matter_lagchecker_ping_this_person", "");
-    g_cvarSendAllStatus = register_cvar("amx_matter_lagchecker_send_all_status", "0");
-    g_cvarCpuThreshold = register_cvar("amx_matter_lagchecker_cpu_threshold", "75");
-    g_cvarFpsThreshold = register_cvar("amx_matter_lagchecker_fps_threshold", "30");
+    g_cvarEnabled = create_cvar("amx_matter_lagchecker_enabled", "1", FCVAR_NONE, "Enable the sub-plugin.", true, 0.0, true, 1.0);
+    g_cvarToPing = create_cvar("amx_matter_lagchecker_ping_this_person", "", FCVAR_PROTECTED, "You can add a ping format for any protocol, for example, to ping you when the server is lagging. For Discord you can use seomthing like <@youruniqueid>, other protocols may use other formats.");
+    g_cvarSendAllStatus = create_cvar("amx_matter_lagchecker_send_all_status", "0", FCVAR_NONE, "Enable if you want to send a message every time a player complains about lag, even if the server is lagging or not.", true, 0.0, true, 1.0);
+    g_cvarComputeThreshold = create_cvar("amx_matter_lagchecker_cpu_threshold", "75", FCVAR_NONE, "If CPU percent is above this, send an alert.", true, 0.0, true, 100.0);
+    g_cvarFramesThreshold = create_cvar("amx_matter_lagchecker_fps_threshold", "30", FCVAR_NONE, "If FPS percent (based on sys_ticrate) is below this, send an alert.", true, 0.0, true, 100.0);
+    AutoExecConfig();
 
     register_dictionary("matteramxx.txt");
 }
 
-public plugin_cfg()
+public OnConfigsExecuted()
 {
-    if(get_pcvar_num(g_cvarEnabled))
+    create_cvar("amx_matter_lagchecker_version", MATTERAMXX_PLUGIN_VERSION, FCVAR_SERVER);
+
+    bind_pcvar_num(g_cvarEnabled, g_bEnabled);
+    bind_pcvar_string(g_cvarToPing, g_szToPing, charsmax(g_szToPing));
+    bind_pcvar_num(g_cvarSendAllStatus, g_bSendAllStatus);
+    bind_pcvar_num(g_cvarComputeThreshold, g_iComputeThreshold);
+    bind_pcvar_num(g_cvarFramesThreshold, g_iFramesThreshold);
+
+    if(g_bEnabled)
     {
         new iMasterPluginIndex = is_plugin_loaded("MatterAMXX");
         if(iMasterPluginIndex > -1)
@@ -55,8 +69,8 @@ public plugin_cfg()
             
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
             {
-                server_print("[MatterAMXX Lag Checker Debug] Plugin is enabled.");
-                server_print("[MatterAMXX Lag Checker Debug] Finished plugin_cfg()");
+                server_print("[DEBUG] %s::plugin_cfg() - Plugin is enabled.", __BINARY__);
+                server_print("[DEBUG] %s::plugin_cfg() - Finished plugin_cfg()", __BINARY__);
             }
 
             g_rPattern = regex_compile_ex(REGEX_STATUS);
@@ -68,7 +82,7 @@ public plugin_cfg()
         pause("ad");
 }
 
-public say_message(iClient)
+public ClientCommand_Say(iClient)
 {
     new sMessage[MESSAGE_LENGTH];
     read_args(sMessage, charsmax(sMessage));
@@ -79,36 +93,36 @@ public say_message(iClient)
     if(iClient)
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
-            server_print("[MatterAMXX Lag Checker Debug] Message is: %s", sMessage);
+            server_print("[DEBUG] %s::ClientCommand_Say() - Message is: %s", __BINARY__, sMessage);
 
         if(containi(sMessage, "lag") != -1)
         {
             if(g_bRestartScheduled)
                 client_print(0, print_chat, "* %L", LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE");
             else
-                set_task(2.0, "execute_lag"); //fixes SZ_GetSpace: tried to write to an uninitialized sizebuf_t: ???
+                set_task(2.0, "Task_ExecuteLagCheck"); //fixes SZ_GetSpace: tried to write to an uninitialized sizebuf_t: ???
         }
     }
 
     return PLUGIN_CONTINUE;
 }
 
-public execute_lag()
+public Task_ExecuteLagCheck()
 {
-    g_szStats = "";
+    new szStats[MESSAGE_LENGTH];
     
-    fake_rcon(g_szStats, sizeof(g_szStats), "stats");
+    fake_rcon(szStats, sizeof(szStats), "stats");
 
-    replace_all(g_szStats, charsmax(g_szStats), "^n", "LB");
+    replace_all(szStats, charsmax(szStats), "^n", "LB");
 
-    new szCpuField[16], szFpsField[16];
-    if(regex_match_c(g_szStats, g_rPattern))
+    new szComputeField[16], szFramesField[16];
+    if(regex_match_c(szStats, g_rPattern))
     {
-        regex_substr(g_rPattern, 1, szCpuField, charsmax(szCpuField));
-        regex_substr(g_rPattern, 2, szFpsField, charsmax(szFpsField));
+        regex_substr(g_rPattern, 1, szComputeField, charsmax(szComputeField));
+        regex_substr(g_rPattern, 2, szFramesField, charsmax(szFramesField));
 
-        new Float:fCpuPercent = str_to_float(szCpuField);
-        new Float:iFpsValue = str_to_float(szFpsField);
+        new Float:fCpuPercent = str_to_float(szComputeField);
+        new Float:iFpsValue = str_to_float(szFramesField);
 
         //my source is that I made it the fuck out
         new Float:fIdealTicrate = get_cvar_num("sys_ticrate")*0.90;
@@ -116,25 +130,23 @@ public execute_lag()
 
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
         {
-            server_print("[MatterAMXX Lag Checker Debug] Ideal desired FPS is: %d", floatround(fIdealTicrate));
-            server_print("[MatterAMXX Lag Checker Debug] Server is running at an ideal %d%% of the desired FPS", iComparedFpsValue);
+            server_print("[DEBUG] %s::Task_ExecuteLagCheck() - Ideal desired FPS is: %d", __BINARY__, floatround(fIdealTicrate));
+            server_print("[DEBUG] %s::Task_ExecuteLagCheck() - Server is running at an ideal %d%% of the desired FPS", __BINARY__, iComparedFpsValue);
         }
 
         new szMatterMessage[MESSAGE_LENGTH];
 
-        if(floatround(fCpuPercent) > get_pcvar_num(g_cvarCpuThreshold) || iComparedFpsValue < get_pcvar_num(g_cvarFpsThreshold))
+        if(floatround(fCpuPercent) > g_iComputeThreshold || iComparedFpsValue < g_iFramesThreshold)
         {
             client_print(0, print_chat, "* %L %L", LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(fCpuPercent), floatround(iFpsValue), LANG_PLAYER, "MATTERAMXX_PLUGIN_LAG_RESTART_SCHEDULE");
-            new szWhoToPing[MAX_NAME_LENGTH];
-            get_pcvar_string(g_cvarToPing, szWhoToPing, charsmax(szWhoToPing));
-            formatex(szMatterMessage, charsmax(szMatterMessage), "%s %L %L", szWhoToPing, LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(fCpuPercent), floatround(iFpsValue), LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_NOTIF");
+            formatex(szMatterMessage, charsmax(szMatterMessage), "%s %L %L", g_szToPing, LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(fCpuPercent), floatround(iFpsValue), LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_NOTIF");
             matteramxx_send_message(szMatterMessage, _, _, true);
             register_message(SVC_INTERMISSION, "Event_Intermission");
             g_bRestartScheduled = true;
         }
         else
         {
-            if(get_pcvar_bool(g_cvarSendAllStatus))
+            if(g_bSendAllStatus)
             {
                 formatex(szMatterMessage, charsmax(szMatterMessage), "* %L", LANG_SERVER, "MATTERAMXX_PLUGIN_LAG_STATS", floatround(fCpuPercent), floatround(iFpsValue));
                 matteramxx_send_message(szMatterMessage, _, _, true);
@@ -145,7 +157,7 @@ public execute_lag()
     else
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
-            server_print("[MatterAMXX Lag Checker Debug] Failure to check regex match");
+            server_print("[DEBUG] %s:: - Failure to check regex match", __BINARY__);
     }
 }
 

@@ -10,6 +10,7 @@
 #define BASE_URL_LENGTH             512
 #define JSON_PARAMETER_LENGTH       512
 #define TOKEN_LENGTH                128
+#define PREFIX_LENGTH               8
 #define CVARLIST_TRIES              6 //cannot be more than 6, inclusive, starts from 0
 #define IP_REGEX                    "((?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){2})((?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9]))"
 #define CVARQUERY_FORMAT            "^"%s^" is ^"%s^"^n"
