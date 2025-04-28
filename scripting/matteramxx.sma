@@ -247,8 +247,6 @@ public plugin_init()
 
     AutoExecConfig();
 
-    g_cvarDeprecatedBridgeUrl = register_cvar("amx_matter_bridge_url", "", FCVAR_PROTECTED | FCVAR_SERVER | FCVAR_UNLOGGED);
-
     register_dictionary("matteramxx.txt");
 
     g_hSayTextUserMessage = get_user_msgid("SayText");
@@ -260,6 +258,9 @@ public plugin_init()
 
 public OnConfigsExecuted()
 {
+    create_cvar("amx_matter_bridge_version", MATTERAMXX_PLUGIN_VERSION, FCVAR_SERVER);
+    g_cvarDeprecatedBridgeUrl = create_cvar("amx_matter_bridge_url", "", FCVAR_PROTECTED | FCVAR_SERVER | FCVAR_UNLOGGED);
+
     bind_pcvar_num(g_cvarEnabled, g_bEnabled);
     bind_pcvar_string(g_cvarSystemAvatarUrl, g_szSystemAvatarUrl, charsmax(g_szSystemAvatarUrl));
     bind_pcvar_string(g_cvarAutogenAvatarUrl, g_szAutogenAvatarUrl, charsmax(g_szAutogenAvatarUrl));
@@ -292,8 +293,6 @@ public OnConfigsExecuted()
     bind_pcvar_num(g_cvarOutgoing_JoinQuit_ShowCount, g_bOutgoingJoinQuitPlayerCount);
     bind_pcvar_string(g_cvarForcePrefix, g_szForcePrefix, charsmax(g_szForcePrefix));
     bind_pcvar_float(g_cvarRetry_Delay, g_fRetryDelay);
-
-    create_cvar("amx_matter_bridge_version", MATTERAMXX_PLUGIN_VERSION, FCVAR_SERVER);
 
     if(g_bEnabled)
     {
