@@ -99,7 +99,7 @@ public OnConfigsExecuted()
 
             g_iTrieObeyTo = TrieCreate();
 
-            new szFileName[128];
+            new szFileName[PLATFORM_MAX_PATH];
             new sConfigDir[64];
             get_configsdir(sConfigDir, charsmax(sConfigDir));
             formatex(szFileName, charsmax(szFileName), "%s/%s", sConfigDir, MATTERAMXX_CONSOLE_OBEY_FILE);
@@ -113,7 +113,6 @@ public OnConfigsExecuted()
             server_exec();
 
             // some games, like ricochet, start from cvarlist01.txt instead of cvarlist00.txt, we need to retry until we get the correct file
-            new szFileName[16];
             new x = 0;
             formatex(szFileName, charsmax(szFileName), "cvarlist0%d.txt", x);
             while(!file_exists(szFileName) && x <= CVARLIST_TRIES)
