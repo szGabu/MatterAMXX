@@ -23,12 +23,6 @@
 
 // ** COMPILER OPTIONS END HERE **
 
-#include <amxmodx>
-
-#if AMXX_VERSION_NUM < 183
-#assert "AMX Mod X versions 1.8.2 and below are not supported."
-#endif
-
 #include <amxmisc>
 #include <fakemeta>
 #include <regex>
