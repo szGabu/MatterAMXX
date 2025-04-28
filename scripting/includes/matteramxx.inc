@@ -1,24 +1,14 @@
-#define TARGET_URL_LENGTH 1024
-#define MESSAGE_LENGTH 512
-#define BASE_URL_LENGTH 256
-#define JSON_PARAMETER_LENGTH 256
-#define TOKEN_LENGTH 64
+#if defined _matteramxx_included
+	#endinput
+#endif
+#define _matteramxx_included
+
+#include <matteramxx_consts>
+#include <amxmodx>
 
 #if AMXX_VERSION_NUM < 183
-    #define MAX_PLAYERS 32
-    #define MAX_NAME_LENGTH 32
+#assert "AMX Mod X versions 1.8.2 and below are not supported."
 #endif
-
-#pragma reqlib "matteramxx"
-
-#if !defined AMXMODX_NOAUTOLOAD
-   #pragma loadlib "matteramxx"
-#endif
-
-enum {
-  MATTER_IGNORE = 0,
-  MATTER_SUPERCEDE,
-};
 
 /**
  * Called when we get a message coming from Matterbridge
