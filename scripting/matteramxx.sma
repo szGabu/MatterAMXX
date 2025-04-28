@@ -49,9 +49,6 @@
 #define TEAM_COLOR_PLACEHOLDER          "$%&/"
 #define OUTSIDER                        0
 
-#define MATTERAMXX_PLUGIN_NAME      "MatterAMXX"
-#define MATTERAMXX_PLUGIN_AUTHOR    "szGabu"
-
 #pragma semicolon 1
 
 enum
@@ -142,7 +139,6 @@ new g_szOutgoingUri[BASE_URL_LENGTH];
 new g_szBridgeUrl[BASE_URL_LENGTH];
 new g_szGateway[MAX_NAME_LENGTH];
 new g_szGamename[MAX_NAME_LENGTH];
-new g_szNameTemporaryBuffer[MAX_NAME_LENGTH];
 
 new g_szLastMessages[MAX_PLAYERS+1][MESSAGE_LENGTH];
 new g_bUserConnected[MAX_PLAYERS+1];
@@ -152,15 +148,14 @@ new g_bUserAuthenticated[MAX_PLAYERS+1];
 new bool:g_bJoinDelayDone = false;
 new bool:g_bIsIntermission = false;
 new bool:g_bShouldBlockChangeNameMessage = false;
-new bool:g_bProcessingMessageQueue = false;
 
 new g_hPrintMessageForward; 
 new g_iPluginFlags;
 
+new g_hSayTextUserMessage;
+
 new Regex:g_rAuthId_Pattern;
 new Regex:g_rPrefix_Pattern;
-
-new Array:g_aMessageQueue;
 
 new const sHexTable[] = "0123456789ABCDEF";
 
@@ -210,7 +205,7 @@ public plugin_init()
     
     register_plugin(MATTERAMXX_PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR);
 
-    new sServername[MAX_NAME_LENGTH];
+    new szServerName[MAX_NAME_LENGTH];
     get_modname(g_szGamename, charsmax(g_szGamename));
 
     if(equali(g_szGamename, "valve"))
@@ -230,7 +225,7 @@ public plugin_init()
     else if(equali(g_szGamename, "svencoop"))
         g_hCurrentGame = GAME_SVENCOOP;
 
-    get_cvar_string("hostname", sServername, charsmax(sServername));
+    get_cvar_string("hostname", szServerName, charsmax(szServerName));
 
     g_cvarEnabled = create_cvar(                            "amx_matter_enable",                                    "1",                                                    FCVAR_NONE,                                         "Determines if MatterAMXX should be enabled.");
     g_cvarSystemAvatarUrl = create_cvar(                    "amx_matter_system_avatar",                             "",                                                     FCVAR_PROTECTED,                                    "URL pointing to a picture that will be used as avatar image in system messages (In protocols that support it).");
@@ -247,7 +242,7 @@ public plugin_init()
     g_cvarIncoming_RefreshTime = create_cvar(               "amx_matter_bridge_incoming_update_time",               "3.0",                                                  FCVAR_NONE,                                         "For incoming messages. Specifies how many seconds it has to wait before querying new incoming messages. Performance wise is tricky, lower values mean the messages will be queried instantly, while higher values will wait and bring all messages at once, both cases may cause overhead. Experiment and see what's ideal for your server.");
     g_cvarUseRelayUser = create_cvar(                       "amx_matter_bridge_incoming_relay_user",                "0",                                                    FCVAR_NONE,                                         "For incoming messages. Determines if incoming messages should use an active player as a relay. It will make usernames to display as color in games like Half-Life Deathmatch and The Specialists. This value is ignored in games like Counter-Strike and Day of Defeat.");
     g_cvarOutgoing = create_cvar(                           "amx_matter_bridge_outgoing",                           "1",                                                    FCVAR_NONE,                                         "Enables outgoing messages (server to protocols).");
-    g_cvarOutgoing_SystemUsername = create_cvar(            "amx_matter_bridge_outgoing_system_username",           sServername,                                            FCVAR_NONE,                                         "For outgoing messages. Name of the 'user' when relying system messages.");
+    g_cvarOutgoing_SystemUsername = create_cvar(            "amx_matter_bridge_outgoing_system_username",           szServerName,                                            FCVAR_NONE,                                         "For outgoing messages. Name of the 'user' when relying system messages.");
     g_cvarOutgoing_Chat_Mode = create_cvar(                 "amx_matter_bridge_outgoing_chat_mode",                 "3",                                                    FCVAR_NONE,                                         "For outgoing messages. Select which chat messages you want to send. (1=All chat 2=Team chat) You must sum the values you want to send. For example, if you want to send everything the value must be 3.");
     g_cvarOutgoing_Chat_SpamFil = create_cvar(              "amx_matter_bridge_outgoing_chat_no_repeat",            "1",                                                    FCVAR_NONE,                                         "For outgoing messages. Implement basic anti-spam filter. Useful for preventing taunt binds from sending multiple times.");
     g_cvarOutgoing_Chat_ZeroifyAtSign = create_cvar(        "amx_matter_bridge_outgoing_chat_zwsp_at",              "1",                                                    FCVAR_NONE,                                         "For outgoing messages. This controls if the plugin should add a ZWSP character after the at symbol (@) to prevent unintentional or malicious pinging.");
@@ -266,47 +261,11 @@ public plugin_init()
 
     AutoExecConfig();
 
-    register_cvar("amx_matter_bridge_version", MATTERAMXX_PLUGIN_VERSION, FCVAR_SERVER);
     g_cvarDeprecatedBridgeUrl = register_cvar("amx_matter_bridge_url", "", FCVAR_PROTECTED | FCVAR_SERVER | FCVAR_UNLOGGED);
 
-    if(g_hCurrentGame != GAME_SVENCOOP)
-    {
-        //sven co-op at the time of writing crashes hooks into the cvar changing
-        bind_pcvar_num(g_cvarEnabled, g_bEnabled);
-        bind_pcvar_string(g_cvarSystemAvatarUrl, g_szSystemAvatarUrl, charsmax(g_szSystemAvatarUrl));
-        bind_pcvar_string(g_cvarAutogenAvatarUrl, g_szAutogenAvatarUrl, charsmax(g_szAutogenAvatarUrl));
-        bind_pcvar_string(g_cvarAvatarUrl, g_szAvatarUrl, charsmax(g_szAvatarUrl));
-        bind_pcvar_string(g_cvarBridgeProtocol, g_szBridgeProtocol, charsmax(g_szBridgeProtocol));
-        bind_pcvar_string(g_cvarBridgeHost, g_szBridgeHost, charsmax(g_szBridgeHost));
-        bind_pcvar_string(g_cvarBridgePort, g_szBridgePort, charsmax(g_szBridgePort));
-        bind_pcvar_string(g_cvarDeprecatedBridgeUrl, g_szBridgeDeprecatedBridgeUrl, charsmax(g_szBridgeDeprecatedBridgeUrl));
-        bind_pcvar_string(g_cvarBridgeGateway, g_szGateway, charsmax(g_szGateway));
-        bind_pcvar_string(g_cvarToken, g_szBridgeToken, charsmax(g_szBridgeToken));
-        bind_pcvar_num(g_cvarIncoming, g_bIncomingMessages);
-        bind_pcvar_num(g_cvarIncoming_DontColorize, g_bIncomingDontColorize);
-        bind_pcvar_string(g_cvarIncoming_IgnorePrefix, g_szIncomingIgnorePrefix, charsmax(g_szIncomingIgnorePrefix));
-        bind_pcvar_float(g_cvarIncoming_RefreshTime, g_fIncomingUpdateTime);
-        bind_pcvar_num(g_cvarUseRelayUser, g_bIncomingRelayMessagesOnUser),
-        bind_pcvar_num(g_cvarOutgoing, g_bOutgoingMessages);
-        bind_pcvar_string(g_cvarOutgoing_SystemUsername, g_szOutgoingSystemUsername, charsmax(g_szOutgoingSystemUsername));
-        bind_pcvar_num(g_cvarOutgoing_Chat_Mode, g_iOutgoingChatMode);
-        bind_pcvar_num(g_cvarOutgoing_Chat_SpamFil, g_bOutgoingNoRepeat);
-        bind_pcvar_num(g_cvarOutgoing_Chat_ZeroifyAtSign, g_bOutgoingZwspAt);
-        bind_pcvar_string(g_cvarOutgoing_Chat_RequirePrefix, g_szOutgoingRequirePrefix, charsmax(g_szOutgoingRequirePrefix));
-        bind_pcvar_num(g_cvarOutgoing_Chat_MuteServer, g_bOutgoingMuteServer);
-        bind_pcvar_num(g_cvarOutgoing_Kills, g_bOutgoingKills);
-        bind_pcvar_num(g_cvarOutgoing_Join, g_bOutgoingJoin);
-        bind_pcvar_float(g_cvarOutgoing_Join_Delay, g_fOutgoingJoinDelay);
-        bind_pcvar_num(g_cvarOutgoing_Quit, g_bOutgoingLeave);
-        bind_pcvar_num(g_cvarOutgoing_Quit_IgnoreIntermission, g_bOutgoingLeaveIgnoreIntermission);
-        bind_pcvar_num(g_cvarOutgoing_StripColors, g_bOutgoingStripColors);
-        bind_pcvar_num(g_cvarOutgoing_DisplayMap, g_bOutgoingDisplayMap);
-        bind_pcvar_num(g_cvarOutgoing_JoinQuit_ShowCount, g_bOutgoingJoinQuitPlayerCount);
-        bind_pcvar_string(g_cvarForcePrefix, g_szForcePrefix, charsmax(g_szForcePrefix));
-        bind_pcvar_float(g_cvarRetry_Delay, g_fRetryDelay);
-    }
-
     register_dictionary("matteramxx.txt");
+
+    g_hSayTextUserMessage = get_user_msgid("SayText");
 
     //TS and SC don't support rendering % 
     if(g_hCurrentGame == GAME_SPECIALISTS || g_hCurrentGame == GAME_SVENCOOP)
@@ -315,42 +274,40 @@ public plugin_init()
 
 public OnConfigsExecuted()
 {
-    if(g_hCurrentGame == GAME_SVENCOOP)
-    {
-        //ditto from plugin_init()
-        g_bEnabled = get_pcvar_bool(g_cvarEnabled);
-        get_pcvar_string(g_cvarSystemAvatarUrl, g_szSystemAvatarUrl, charsmax(g_szSystemAvatarUrl));
-        get_pcvar_string(g_cvarAutogenAvatarUrl, g_szAutogenAvatarUrl, charsmax(g_szAutogenAvatarUrl));
-        get_pcvar_string(g_cvarAvatarUrl, g_szAvatarUrl, charsmax(g_szAvatarUrl));
-        get_pcvar_string(g_cvarBridgeProtocol, g_szBridgeProtocol, charsmax(g_szBridgeProtocol));
-        get_pcvar_string(g_cvarBridgeHost, g_szBridgeHost, charsmax(g_szBridgeHost));
-        get_pcvar_string(g_cvarBridgePort, g_szBridgePort, charsmax(g_szBridgePort));
-        get_pcvar_string(g_cvarDeprecatedBridgeUrl, g_szBridgeDeprecatedBridgeUrl, charsmax(g_szBridgeDeprecatedBridgeUrl));
-        get_pcvar_string(g_cvarBridgeGateway, g_szGateway, charsmax(g_szGateway));
-        get_pcvar_string(g_cvarToken, g_szBridgeToken, charsmax(g_szBridgeToken));
-        g_bIncomingMessages = get_pcvar_bool(g_cvarIncoming);
-        g_bIncomingDontColorize = get_pcvar_bool(g_cvarIncoming_DontColorize);
-        get_pcvar_string(g_cvarIncoming_IgnorePrefix, g_szIncomingIgnorePrefix, charsmax(g_szIncomingIgnorePrefix));
-        g_fIncomingUpdateTime = get_pcvar_float(g_cvarIncoming_RefreshTime);
-        g_bIncomingRelayMessagesOnUser = get_pcvar_bool(g_cvarUseRelayUser);
-        g_bOutgoingMessages = get_pcvar_bool(g_cvarOutgoing);
-        get_pcvar_string(g_cvarOutgoing_SystemUsername, g_szOutgoingSystemUsername, charsmax(g_szOutgoingSystemUsername));
-        g_iOutgoingChatMode = get_pcvar_num(g_cvarOutgoing_Chat_Mode);
-        g_bOutgoingNoRepeat = get_pcvar_bool(g_cvarOutgoing_Chat_SpamFil);
-        g_bOutgoingZwspAt = get_pcvar_bool(g_cvarOutgoing_Chat_ZeroifyAtSign);
-        get_pcvar_string(g_cvarOutgoing_Chat_RequirePrefix, g_szOutgoingRequirePrefix, charsmax(g_szOutgoingRequirePrefix));
-        g_bOutgoingMuteServer = get_pcvar_bool(g_cvarOutgoing_Chat_MuteServer);
-        g_bOutgoingKills = get_pcvar_bool(g_cvarOutgoing_Kills);
-        g_bOutgoingJoin = get_pcvar_bool(g_cvarOutgoing_Join);
-        g_fOutgoingJoinDelay = get_pcvar_float(g_cvarOutgoing_Join_Delay);
-        g_bOutgoingLeave = get_pcvar_bool(g_cvarOutgoing_Quit);
-        g_bOutgoingLeaveIgnoreIntermission = get_pcvar_bool(g_cvarOutgoing_Quit_IgnoreIntermission);
-        g_bOutgoingStripColors = get_pcvar_bool(g_cvarOutgoing_StripColors);
-        g_bOutgoingDisplayMap = get_pcvar_bool(g_cvarOutgoing_DisplayMap);
-        g_bOutgoingJoinQuitPlayerCount = get_pcvar_bool(g_cvarOutgoing_JoinQuit_ShowCount);
-        get_pcvar_string(g_cvarForcePrefix, g_szForcePrefix, charsmax(g_szForcePrefix));
-        g_fRetryDelay = get_pcvar_float(g_cvarRetry_Delay);
-    }
+    bind_pcvar_num(g_cvarEnabled, g_bEnabled);
+    bind_pcvar_string(g_cvarSystemAvatarUrl, g_szSystemAvatarUrl, charsmax(g_szSystemAvatarUrl));
+    bind_pcvar_string(g_cvarAutogenAvatarUrl, g_szAutogenAvatarUrl, charsmax(g_szAutogenAvatarUrl));
+    bind_pcvar_string(g_cvarAvatarUrl, g_szAvatarUrl, charsmax(g_szAvatarUrl));
+    bind_pcvar_string(g_cvarBridgeProtocol, g_szBridgeProtocol, charsmax(g_szBridgeProtocol));
+    bind_pcvar_string(g_cvarBridgeHost, g_szBridgeHost, charsmax(g_szBridgeHost));
+    bind_pcvar_string(g_cvarBridgePort, g_szBridgePort, charsmax(g_szBridgePort));
+    bind_pcvar_string(g_cvarDeprecatedBridgeUrl, g_szBridgeDeprecatedBridgeUrl, charsmax(g_szBridgeDeprecatedBridgeUrl));
+    bind_pcvar_string(g_cvarBridgeGateway, g_szGateway, charsmax(g_szGateway));
+    bind_pcvar_string(g_cvarToken, g_szBridgeToken, charsmax(g_szBridgeToken));
+    bind_pcvar_num(g_cvarIncoming, g_bIncomingMessages);
+    bind_pcvar_num(g_cvarIncoming_DontColorize, g_bIncomingDontColorize);
+    bind_pcvar_string(g_cvarIncoming_IgnorePrefix, g_szIncomingIgnorePrefix, charsmax(g_szIncomingIgnorePrefix));
+    bind_pcvar_float(g_cvarIncoming_RefreshTime, g_fIncomingUpdateTime);
+    bind_pcvar_num(g_cvarUseRelayUser, g_bIncomingRelayMessagesOnUser),
+    bind_pcvar_num(g_cvarOutgoing, g_bOutgoingMessages);
+    bind_pcvar_string(g_cvarOutgoing_SystemUsername, g_szOutgoingSystemUsername, charsmax(g_szOutgoingSystemUsername));
+    bind_pcvar_num(g_cvarOutgoing_Chat_Mode, g_iOutgoingChatMode);
+    bind_pcvar_num(g_cvarOutgoing_Chat_SpamFil, g_bOutgoingNoRepeat);
+    bind_pcvar_num(g_cvarOutgoing_Chat_ZeroifyAtSign, g_bOutgoingZwspAt);
+    bind_pcvar_string(g_cvarOutgoing_Chat_RequirePrefix, g_szOutgoingRequirePrefix, charsmax(g_szOutgoingRequirePrefix));
+    bind_pcvar_num(g_cvarOutgoing_Chat_MuteServer, g_bOutgoingMuteServer);
+    bind_pcvar_num(g_cvarOutgoing_Kills, g_bOutgoingKills);
+    bind_pcvar_num(g_cvarOutgoing_Join, g_bOutgoingJoin);
+    bind_pcvar_float(g_cvarOutgoing_Join_Delay, g_fOutgoingJoinDelay);
+    bind_pcvar_num(g_cvarOutgoing_Quit, g_bOutgoingLeave);
+    bind_pcvar_num(g_cvarOutgoing_Quit_IgnoreIntermission, g_bOutgoingLeaveIgnoreIntermission);
+    bind_pcvar_num(g_cvarOutgoing_StripColors, g_bOutgoingStripColors);
+    bind_pcvar_num(g_cvarOutgoing_DisplayMap, g_bOutgoingDisplayMap);
+    bind_pcvar_num(g_cvarOutgoing_JoinQuit_ShowCount, g_bOutgoingJoinQuitPlayerCount);
+    bind_pcvar_string(g_cvarForcePrefix, g_szForcePrefix, charsmax(g_szForcePrefix));
+    bind_pcvar_float(g_cvarRetry_Delay, g_fRetryDelay);
+
+    create_cvar("amx_matter_bridge_version", MATTERAMXX_PLUGIN_VERSION, FCVAR_SERVER);
 
     if(g_bEnabled)
     {
@@ -424,12 +381,6 @@ public OnConfigsExecuted()
 
             if(!empty(g_szIncomingIgnorePrefix))
                 g_rPrefix_Pattern = regex_compile(g_szIncomingIgnorePrefix);
-        }
-
-        if(g_bIncomingRelayMessagesOnUser && g_hCurrentGame != GAME_CSTRIKE && g_hCurrentGame != GAME_CZERO && g_hCurrentGame != GAME_DOD)
-        {
-            g_aMessageQueue = ArrayCreate(aMessageQueueStruct);
-            register_message(get_user_msgid("SayText"), "Event_RelayUserChangeName");
         }
 
         g_iPluginFlags = plugin_flags();
@@ -674,7 +625,7 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
                     if(g_iPluginFlags & AMX_FLAG_DEBUG)
                         server_print("[DEBUG] matteramxx.amxx::MatterPrintMessage() - g_bIncomingRelayMessagesOnUser");
                     //we need to create a message queue, otherwise race conditions might occur
-                    AddMessageToRelayQueue(szMessage, szUserName);
+                    PrintRelayUser(szMessage, szUserName);
                 }
                 else
                 {
@@ -695,149 +646,85 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
     }  
 }
 
-AddMessageToRelayQueue(const szMessage[], const szUserName[], const iClient = 0)
-{
-    new aMessageData[aMessageQueueStruct];
-    copy(aMessageData[szMessageQueueName], charsmax(aMessageData), szUserName);
-    copy(aMessageData[szMessageQueueMessage], charsmax(aMessageData), szMessage);
-    aMessageData[iMessageQueueClient] = iClient;
-    ArrayPushArray(g_aMessageQueue, aMessageData);
-
-    if(!g_bProcessingMessageQueue)
-    {
-        g_bProcessingMessageQueue = true;
-        ProcessMessageQueue();
-    }
-}
-
-public ProcessMessageQueue()
-{
-    if(ArraySize(g_aMessageQueue) > 0)
-    {
-        new iIndex = 0; //always process first
-        new aData[aMessageQueueStruct];
-        ArrayGetArray(g_aMessageQueue, iIndex, aData);
-
-        new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH], iClient;
-
-        copy(szUserName, charsmax(szUserName), aData[szMessageQueueName]);
-        copy(szMessage, charsmax(szMessage), aData[szMessageQueueMessage]);
-        iClient = aData[iMessageQueueClient];
-
-        PrintRelayUser(szMessage, szUserName, iClient);
-
-        ArrayDeleteItem(g_aMessageQueue, iIndex);
-
-        ProcessMessageQueue();
-    }
-    else
-        g_bProcessingMessageQueue = false;
-}
-
 PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
 {
-    new szNewUserName[MAX_NAME_LENGTH];
-    copy(szNewUserName, charsmax(szNewUserName), szUserName);
+    new szFixedUserName[MAX_NAME_LENGTH];
+    copy(szFixedUserName, charsmax(szFixedUserName), szUserName);
 
     // the following symbols are known to glitch out the chat
-    replace_all(szNewUserName, charsmax(szNewUserName), "#", "¤");
-    // replace_all(szNewUserName, charsmax(szNewUserName), "@", "¤"); // apparently it only causes problems in Windows clients
+    replace_all(szFixedUserName, charsmax(szFixedUserName), "#", "¤");
+    // replace_all(szFixedUserName, charsmax(szFixedUserName), "@", "¤"); // apparently it only causes problems in Windows clients
 
+    new szTemporaryNameBuffer[MAX_NAME_LENGTH], szUserInfoBuffer[256];
+    new bool:bShouldRevertName = false;
     if(iClient == 0)
     {
         // we need to use a player as a relay to preserve correct text rendering
-        iClient = GetAnyPlayer();
-        
-        if(g_iPluginFlags & AMX_FLAG_DEBUG)
-            server_print("[DEBUG] matteramxx.amxx::PrintRelayUser() - Renaming client %d to %s", iClient, szNewUserName);
+        iClient = get_suitable_target();
+        if(iClient > 0)
+        {
+            bShouldRevertName = true;
+            
+            if(g_iPluginFlags & AMX_FLAG_DEBUG)
+                server_print("[DEBUG] matteramxx.amxx::PrintRelayUser() - Renaming client %d to %s", iClient, szFixedUserName);
 
-        get_user_name(iClient, g_szNameTemporaryBuffer, charsmax(g_szNameTemporaryBuffer));
-        g_bShouldBlockChangeNameMessage = true;
-        set_user_info(iClient, "name", szNewUserName);
-
-        // we need to wait for the name change to propagate to clients
-        set_task(floatmax(GetHighestPing()/1000.0, 0.1), "PrintRelayUser_Post", FAKEBOT_TASK_ID+iClient, szMessage, MESSAGE_LENGTH);
-    }
-    else
-    {
-        // if not 0, the user said this, call this thing directly because there's no propagation needed
-        PrintRelayUser_Post(szMessage, iClient);  
-    }
-}
-
-public PrintRelayUser_Post(const szMessage[], iTaskId)
-{
-    //to add colors in names in games that are not CS or DOD 
-    // we need to send the SayText message from scratch
-    if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] matteramxx.amxx::PrintRelayUser_Post() - Fake Post Print Post: Message: %s", szMessage);
-
-    new bool:bInstant = false;
-    new iClient = iTaskId - FAKEBOT_TASK_ID;
-    if(iTaskId - FAKEBOT_TASK_ID < 0)
-    {
-        //called directly
-        iClient = iTaskId; 
-        bInstant = true;
+            get_user_name(iClient, szTemporaryNameBuffer, charsmax(szTemporaryNameBuffer));
+            set_user_info(iClient, "name", szFixedUserName);
+            copy_infokey_buffer(engfunc(EngFunc_GetInfoKeyBuffer, iClient), szUserInfoBuffer, charsmax(szUserInfoBuffer));
+            message_begin(MSG_ALL, SVC_UPDATEUSERINFO);
+            write_byte(iClient - 1);
+            write_long(get_user_userid(iClient));
+            write_string(szUserInfoBuffer);
+            write_long(0);
+            write_long(0);
+            write_long(0);
+            write_long(0);
+            message_end();
+        }
     }
 
-    if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] matteramxx.amxx::PrintRelayUser_Post() - Fake say message relay is %N", iClient);
-
-    new szUserName[MAX_NAME_LENGTH];
-    get_user_name(iClient, szUserName, charsmax(szUserName));
-    new szMessageNew[MESSAGE_LENGTH];
+    new szFormattedMessage[MESSAGE_LENGTH];
 
     if(strlen(g_szForcePrefix) > 0)
-        formatex(szMessageNew, charsmax(szMessageNew), "^2%s %s: %s", g_szForcePrefix, szUserName, szMessage);
+        formatex(szFormattedMessage, charsmax(szFormattedMessage), "^2%s %s: %s", g_szForcePrefix, szFixedUserName, szMessage);
     else
-        formatex(szMessageNew, charsmax(szMessageNew), "^2%s: %s", szUserName, szMessage);
+        formatex(szFormattedMessage, charsmax(szFormattedMessage), "^2%s: %s", szFixedUserName, szMessage);
 
-    //strcat(szMessageNew, "^n", charsmax(szMessageNew));
-
-    if(g_bOutgoingMuteServer) //id of zero and muteserver should never happen
+    if(g_bOutgoingMuteServer) 
     {
-        emessage_begin(MSG_ONE, get_user_msgid("SayText"), {0,0,0}, iClient);
-        ewrite_byte(iClient);
-        ewrite_string(szMessageNew);
-        emessage_end();
+        if(iClient != 0)
+        {
+            //id of zero and muteserver should never happen, this is for added security
+            message_begin(MSG_ONE, g_hSayTextUserMessage, _, iClient);
+            write_byte(iClient);
+            write_string(szFormattedMessage);
+            message_end();
+        }
     }
     else
     {
-        emessage_begin(MSG_BROADCAST, get_user_msgid("SayText"));
-        ewrite_byte(iClient);
-        ewrite_string(szMessageNew);
-        emessage_end();
+        message_begin(MSG_ALL, g_hSayTextUserMessage);
+        write_byte(iClient);
+        write_string(szFormattedMessage);
+        message_end();
     }
-    
-    server_print(szMessageNew);
 
-    //ditto, we need to wait for propagation if we used a player and not self
-    if(!bInstant)
-        set_task(floatmax(GetHighestPing()/1000.0, 0.1), "ChangeNameBack", FAKEBOT_TASK_ID_POST+iClient);
-}
+    server_print(szFormattedMessage);
 
-public ChangeNameBack(iTaskId)
-{
-    new iClient = iTaskId - FAKEBOT_TASK_ID_POST;
-    if(strlen(g_szNameTemporaryBuffer) > 0)
+    if(bShouldRevertName)
     {
-        if(g_iPluginFlags & AMX_FLAG_DEBUG)
-            server_print("[DEBUG] matteramxx.amxx::ChangeNameBack() - Renaming fakebot %d back to %s", iClient, g_szNameTemporaryBuffer);
-
-        set_user_info(iClient, "name", g_szNameTemporaryBuffer);
-
-        g_szNameTemporaryBuffer = "";
-
-        //name change happens after this frame, so we can't g_bShouldBlockChangeNameMessage on this method 
-        RequestFrame("EnableNameChangeMsg");
+        set_user_info(iClient, "name", szTemporaryNameBuffer);
+        copy_infokey_buffer(engfunc(EngFunc_GetInfoKeyBuffer, iClient), szUserInfoBuffer, charsmax(szUserInfoBuffer));
+        message_begin(MSG_ALL, SVC_UPDATEUSERINFO);
+        write_byte(iClient - 1);
+        write_long(get_user_userid(iClient));
+        write_string(szUserInfoBuffer);
+        write_long(0);
+        write_long(0);
+        write_long(0);
+        write_long(0);
+        message_end();
     }
-}
-
-public EnableNameChangeMsg()
-{
-    g_bShouldBlockChangeNameMessage = false;
-    ProcessMessageQueue();
 }
 
 public Event_SayMessage(iClient)
@@ -944,7 +831,7 @@ public Event_SayMessage(iClient)
 
     if(g_bIncomingRelayMessagesOnUser)
     {
-        AddMessageToRelayQueue(szMessage, szUserName, iClient);
+        PrintRelayUser(szMessage, szUserName, iClient);
         return PLUGIN_HANDLED;
     }
     else
@@ -1166,34 +1053,31 @@ public client_putinserver(id)
     }
 }
 
-GetAnyPlayer()
+stock get_suitable_target()
 {
-    for(new iClient = 1; iClient <= MaxClients; iClient++)
+    // First try to find HLTV proxy
+    for (new iClient = 1; iClient <= MaxClients; iClient++) 
     {
-        // The Specialists doesn't like when a bot sends a message
-        if(is_user_connected(iClient) && (g_hCurrentGame != GAME_SPECIALISTS || (g_hCurrentGame == GAME_SPECIALISTS && !is_user_bot(iClient))))
+        if (is_user_connected(iClient) && is_user_hltv(iClient))
             return iClient;
     }
-
-    return 0;
-}
-
-GetHighestPing()
-{
-    new iMaxPing = 1; //error margin
-    for(new iClient = 1; iClient <= MaxClients; iClient++)
-    {
-        if(is_user_connected(iClient) && !is_user_bot(iClient))
-        {
-            new iUserPing = 0;
-            new iUserLoss = 0;
-            get_user_ping(iClient, iUserPing, iUserLoss);
-            if(iUserPing > iMaxPing)
-                iMaxPing = iUserPing;
-        }
     
+    // Next try to find a bot
+    for (new iClient = 1; iClient <= MaxClients; iClient++) 
+    {
+        if (is_user_connected(iClient) && is_user_bot(iClient))
+            return iClient;
     }
-    return iMaxPing;
+    
+    // Next try to find a regular player
+    for (new iClient = 1; iClient <= MaxClients; iClient++) 
+    {
+        if (is_user_connected(iClient) && !is_user_bot(iClient) && !is_user_hltv(iClient))
+            return iClient;
+    }
+    
+    // If nothing found, return zero
+    return 0;
 }
 
 stock empty(const string[])
