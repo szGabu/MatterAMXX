@@ -9,14 +9,14 @@
 
 // Enable if you want to use HamSandwich (recommended)
 // Disable if you want to use DeathMsg, for example in games that do not have HamSandwich support like Ricochet
-// Useful in: Ricochet and mods with no virtual table data
+// Useful in: Ricochet and games with no virtual table data
 #define USE_HAMSANDWICH 0
 
 // Enable if you want to use the deprecated `client_disconnect()` forward instead of the newer `client_disconnected()`
 // Useful in engines where there are no signature for the newer forward yet
 // This WILL cause a warning on compilation, but can be safely ignored
 // Useful in: Bleeding edge versions of Svengine
-#define USE_DEPRECATED_DISCONNECT_FORWARD 0
+#define USE_DEPRECATED_DISCONNECT_FORWARD 1
 // Did you know pawn supports a warning disable pragma but it was removed from AMX?
 // Yet they use the warning disable pragma in C when they compile AMXX bins?
 // Crazy right?
@@ -133,7 +133,6 @@ new g_bUserAuthenticated[MAX_PLAYERS+1];
 
 new bool:g_bJoinDelayDone = false;
 new bool:g_bIsIntermission = false;
-new bool:g_bShouldBlockChangeNameMessage = false;
 
 new g_hPrintMessageForward; 
 new g_iPluginFlags;
@@ -215,8 +214,8 @@ public plugin_init()
 
     g_cvarEnabled = create_cvar(                            "amx_matter_enable",                                    "1",                                                  FCVAR_NONE,       "Determines if MatterAMXX should be enabled.");
     g_cvarSystemAvatarUrl = create_cvar(                    "amx_matter_system_avatar",                             "",                                                   FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in system messages (In protocols that support it).");
-    g_cvarAutogenAvatarUrl = create_cvar(                   "amx_matter_autogenerate_avatar",                       "https://robohash.org/%s.png?set=set4",               FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in unauthenticated player messages (In protocols that support it).");
-    g_cvarAvatarUrl = create_cvar(                          "amx_matter_player_avatar",                             "http://yourhost/avatars/get_avatar.php?steamid=%s",  FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in player messages (In protocols that support it), note that this is dynamic based on the user's Steam ID64, if it can't be retrieved the message will use unauthenticated avatars.");
+    g_cvarAutogenAvatarUrl = create_cvar(                   "amx_matter_autogenerate_avatar",                       "https://robohash.org/%s.png?set=set4",               FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in unauthenticated player messages (In protocols that support it). Use %s to pass the name as a parameter.");
+    g_cvarAvatarUrl = create_cvar(                          "amx_matter_player_avatar",                             "http://yourhost/avatars/get_avatar.php?steamid=%s",  FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in player messages (In protocols that support it), note that this is dynamic based on the user's Steam ID64, if it can't be retrieved the message will use unauthenticated avatars. Use %s to pass the SID64 as a parameter.");
     g_cvarBridgeProtocol = create_cvar(                     "amx_matter_bridge_protocol",                           "http",                                               FCVAR_PROTECTED,  "Protocol of where the bridge is located.");
     g_cvarBridgeHost = create_cvar(                         "amx_matter_bridge_host",                               "localhost",                                          FCVAR_PROTECTED,  "Host of where the bridge is located.");
     g_cvarBridgePort = create_cvar(                         "amx_matter_bridge_port",                               "1337",                                               FCVAR_PROTECTED,  "Port of where the bridge is located.");
@@ -511,28 +510,6 @@ public MatterIncomingMessage()
     grip_destroy_json_value(gJson);
 
     set_task(g_fIncomingUpdateTime, "MatterConnectAPI");
-}
-
-public Event_RelayUserChangeName(msgid, dest, receiver)
-{
-    new szMessage[MESSAGE_LENGTH];
-    get_msg_arg_string(2, szMessage, charsmax(szMessage));
-
-    // if(g_iPluginFlags & AMX_FLAG_DEBUG)
-    // {
-    //     new szDebugMessage[MESSAGE_LENGTH];
-    //     copy(szDebugMessage, charsmax(szDebugMessage), szMessage);
-    //     for(new i=0; i < sizeof(szDebugMessage);i++)
-    //     {
-    //         server_print("[DEBUG] %s::Event_RelayUserChangeName() - %d", __BINARY__, szDebugMessage[i]);
-    //     }
-        
-    // }
-
-    if(contain(szMessage, "changed name to") != -1 && g_bShouldBlockChangeNameMessage)
-        return PLUGIN_HANDLED;
-    else
-        return PLUGIN_CONTINUE;
 }
 
 public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProtocol[MAX_NAME_LENGTH], szUserIdentifier[MAX_NAME_LENGTH])
