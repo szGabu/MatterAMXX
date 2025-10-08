@@ -652,9 +652,9 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
     new szFormattedMessage[MESSAGE_LENGTH];
 
     if(strlen(g_szForcePrefix) > 0)
-        formatex(szFormattedMessage, charsmax(szFormattedMessage), "^2%s %s: %s", g_szForcePrefix, szFixedUserName, szMessage);
+        formatex(szFormattedMessage, charsmax(szFormattedMessage), "^2%s %s: %s ^n", g_szForcePrefix, szFixedUserName, szMessage);
     else
-        formatex(szFormattedMessage, charsmax(szFormattedMessage), "^2%s: %s", szFixedUserName, szMessage);
+        formatex(szFormattedMessage, charsmax(szFormattedMessage), "^2%s: %s ^n", szFixedUserName, szMessage);
 
     if(g_bOutgoingMuteServer) 
     {
@@ -674,6 +674,8 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
         write_string(szFormattedMessage);
         message_end();
     }
+
+    replace_all(szFormattedMessage, charsmax(szFormattedMessage), "^n", "");
 
     server_print(szFormattedMessage);
 
