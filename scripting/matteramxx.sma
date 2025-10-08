@@ -62,6 +62,7 @@ new g_cvarIncoming_RefreshTime;
 new g_cvarOutgoing;
 new g_cvarOutgoing_SystemUsername;
 new g_cvarOutgoing_Chat_Mode;
+new g_cvarOutgoing_Chat_NoCopyBack;
 new g_cvarOutgoing_Chat_SpamFil;
 new g_cvarOutgoing_Chat_ZeroifyAtSign;
 new g_cvarOutgoing_Chat_RequirePrefix;
@@ -104,6 +105,7 @@ new bool:g_bIncomingRelayMessagesOnUser = false;
 new bool:g_bOutgoingMessages = false;
 new g_szOutgoingSystemUsername[MAX_NAME_LENGTH];
 new g_iOutgoingChatMode = 0;
+new bool:g_bOutgoingNoCopyBack = false;
 new bool:g_bOutgoingNoRepeat = false;
 new bool:g_bOutgoingZwspAt = false;
 new g_szOutgoingRequirePrefix[SHORT_LENGTH];
@@ -229,6 +231,7 @@ public plugin_init()
     g_cvarOutgoing = create_cvar(                           "amx_matter_bridge_outgoing",                           "1",                                                  FCVAR_NONE,       "Enables outgoing messages (server to protocols).");
     g_cvarOutgoing_SystemUsername = create_cvar(            "amx_matter_bridge_outgoing_system_username",           szServerName,                                         FCVAR_NONE,       "For outgoing messages. Name of the 'user' when relying system messages.");
     g_cvarOutgoing_Chat_Mode = create_cvar(                 "amx_matter_bridge_outgoing_chat_mode",                 "3",                                                  FCVAR_NONE,       "For outgoing messages. Select which chat messages you want to send. (1=All chat 2=Team chat) You must sum the values you want to send. For example, if you want to send everything the value must be 3.");
+    g_cvarOutgoing_Chat_NoCopyBack = create_cvar(           "amx_matter_bridge_outgoing_chat_no_copyback",          "1",                                                  FCVAR_NONE,       "For outgoing messages. Prevents the plugin from re-printing a message that comes from within.");
     g_cvarOutgoing_Chat_SpamFil = create_cvar(              "amx_matter_bridge_outgoing_chat_no_repeat",            "1",                                                  FCVAR_NONE,       "For outgoing messages. Implement basic anti-spam filter. Useful for preventing taunt binds from sending multiple times.");
     g_cvarOutgoing_Chat_ZeroifyAtSign = create_cvar(        "amx_matter_bridge_outgoing_chat_zwsp_at",              "1",                                                  FCVAR_NONE,       "For outgoing messages. This controls if the plugin should add a ZWSP character after the at symbol (@) to prevent unintentional or malicious pinging.");
     g_cvarOutgoing_Chat_RequirePrefix = create_cvar(        "amx_matter_bridge_outgoing_chat_require_prefix",       "",                                                   FCVAR_NONE,       "For outgoing messages. Messages need this prefix to be able to be sent. Regex compatible.");
@@ -278,6 +281,7 @@ public OnConfigsExecuted()
     bind_pcvar_num(g_cvarOutgoing, g_bOutgoingMessages);
     bind_pcvar_string(g_cvarOutgoing_SystemUsername, g_szOutgoingSystemUsername, charsmax(g_szOutgoingSystemUsername));
     bind_pcvar_num(g_cvarOutgoing_Chat_Mode, g_iOutgoingChatMode);
+    bind_pcvar_num(g_cvarOutgoing_Chat_NoCopyBack, g_bOutgoingNoCopyBack);
     bind_pcvar_num(g_cvarOutgoing_Chat_SpamFil, g_bOutgoingNoRepeat);
     bind_pcvar_num(g_cvarOutgoing_Chat_ZeroifyAtSign, g_bOutgoingZwspAt);
     bind_pcvar_string(g_cvarOutgoing_Chat_RequirePrefix, g_szOutgoingRequirePrefix, charsmax(g_szOutgoingRequirePrefix));
@@ -791,47 +795,52 @@ public Event_SayMessage(iClient)
         server_print("[DEBUG] %s::Event_SayMessage() - I'm going to send the message.", __BINARY__);
     send_message_rest(gJson, g_szGateway);
 
-    if(g_bIncomingRelayMessagesOnUser)
+    if(g_bOutgoingNoCopyBack)
+        return PLUGIN_CONTINUE;
+    else 
     {
-        PrintRelayUser(szMessage, szUserName, iClient);
-        return PLUGIN_HANDLED;
-    }
-    else
-    {
-        new szMessageNew[MESSAGE_LENGTH];
-        if(strlen(g_szForcePrefix) == 0)
+        if(g_bIncomingRelayMessagesOnUser)
         {
-            if(g_bOutgoingMuteServer)
-            {
-                formatex(szMessageNew, charsmax(szMessageNew), "(YOU) %s%s: %s", szUserName, cstrike_running() ? "^1" : "", szMessage);
-                if(cstrike_running())
-                    client_print_color(iClient, iClient, szMessageNew);
-                else
-                    client_print(iClient, print_chat, szMessageNew);
-                return PLUGIN_HANDLED;
-            }
-            else
-                return PLUGIN_CONTINUE;
+            PrintRelayUser(szMessage, szUserName, iClient);
+            return PLUGIN_HANDLED;
         }
         else
         {
-            if(cstrike_running())
+            new szMessageNew[MESSAGE_LENGTH];
+            if(strlen(g_szForcePrefix) == 0)
             {
-                formatex(szMessageNew, charsmax(szMessageNew), "%s %s%s%s: %s", g_szForcePrefix, 0 < iClient && iClient <= MAX_PLAYERS ? "^3" : "^4", szUserName, cstrike_running() ? "^1" : "", szMessage);
-                client_print_color(g_bOutgoingMuteServer ? iClient : 0, iClient, szMessageNew);
+                if(g_bOutgoingMuteServer)
+                {
+                    formatex(szMessageNew, charsmax(szMessageNew), "(YOU) %s%s: %s", szUserName, cstrike_running() ? "^1" : "", szMessage);
+                    if(cstrike_running())
+                        client_print_color(iClient, iClient, szMessageNew);
+                    else
+                        client_print(iClient, print_chat, szMessageNew);
+                    return PLUGIN_HANDLED;
+                }
+                else
+                    return PLUGIN_CONTINUE;
             }
             else
             {
-                formatex(szMessageNew, charsmax(szMessageNew), "%s %s%s: %s", g_szForcePrefix, szUserName, cstrike_running() ? "^1" : "", szMessage);
-                client_print(g_bOutgoingMuteServer ? iClient : 0, print_chat, szMessageNew);
+                if(cstrike_running())
+                {
+                    formatex(szMessageNew, charsmax(szMessageNew), "%s %s%s%s: %s", g_szForcePrefix, 0 < iClient && iClient <= MAX_PLAYERS ? "^3" : "^4", szUserName, cstrike_running() ? "^1" : "", szMessage);
+                    client_print_color(g_bOutgoingMuteServer ? iClient : 0, iClient, szMessageNew);
+                }
+                else
+                {
+                    formatex(szMessageNew, charsmax(szMessageNew), "%s %s%s: %s", g_szForcePrefix, szUserName, cstrike_running() ? "^1" : "", szMessage);
+                    client_print(g_bOutgoingMuteServer ? iClient : 0, print_chat, szMessageNew);
+                }
             }
-        }
 
-        //Matterbridge messages already come with a line end character, this ensures correct console display
-        replace_all(szMessage, charsmax(szMessage), "^n", ""); 
-        
-        server_print("%s: %s", szUserName, szMessage);
-        return PLUGIN_HANDLED;
+            //Matterbridge messages already come with a line end character, this ensures correct console display
+            replace_all(szMessage, charsmax(szMessage), "^n", ""); 
+            
+            server_print("%s: %s", szUserName, szMessage);
+            return PLUGIN_HANDLED;
+        }
     }
 }
 
