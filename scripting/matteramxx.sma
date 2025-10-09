@@ -926,7 +926,6 @@ public outgoing_message(EzHttpRequest:request)
         {
             new sIncomingMessage[MESSAGE_LENGTH];
             new EzJSON:requestHandle = ezhttp_parse_json_response(request);
-            server_print("JSON is: %d", requestHandle);
             ezjson_serial_to_string(requestHandle, sIncomingMessage, charsmax(sIncomingMessage));
             server_print(sIncomingMessage);
         }
