@@ -27,13 +27,14 @@
 #include <fakemeta>
 #include <regex>
 #include <fun>
+#include <json>
 
 #if USE_HAMSANDWICH > 0
     #include <hamsandwich>
 #endif
 
 #include <matteramxx_consts>
-#include <grip>
+#include <easy_http>
 
 #pragma semicolon 1
 
@@ -77,10 +78,6 @@ new g_cvarOutgoing_JoinQuit_ShowCount;
 new g_cvarOutgoing_StripColors;
 new g_cvarOutgoing_DisplayMap;
 new g_cvarRetry_Delay;
-new GripRequestCancellation:g_gripIncomingHandle;
-new GripRequestCancellation:g_gripOutgoingHandle;
-new GripRequestOptions:g_gIncomingHeader;
-new GripRequestOptions:g_gOutgoingHeader;
 
 new g_cvarDeprecatedBridgeUrl; //deprecated
 
@@ -302,17 +299,7 @@ public OnConfigsExecuted()
         PrepareBridgeUrl();
 
         if(g_bOutgoingMessages)
-        {
-            g_gOutgoingHeader = grip_create_default_options();
-            grip_options_add_header(g_gOutgoingHeader, "Content-Type", "application/json");
-
-            if(!empty(g_szBridgeToken))
-            {
-                new szTokenHeader[JSON_PARAMETER_LENGTH];
-                formatex(szTokenHeader, charsmax(szTokenHeader), "Bearer %s", g_szBridgeToken);
-                grip_options_add_header(g_gOutgoingHeader, "Authorization", szTokenHeader);
-            }
-            
+        {  
             formatex(g_szOutgoingUri, charsmax(g_szOutgoingUri), "%s/api/message", g_szBridgeUrl);
             
             if(g_iOutgoingChatMode > 0)
@@ -350,15 +337,6 @@ public OnConfigsExecuted()
         if(g_bIncomingMessages)
         {
             formatex(g_szIncomingUri, charsmax(g_szIncomingUri), "%s/api/messages", g_szBridgeUrl);
-       
-            g_gIncomingHeader = grip_create_default_options();
-
-            if(!empty(g_szBridgeToken))
-            {
-                new szTokenHeader[JSON_PARAMETER_LENGTH];
-                formatex(szTokenHeader, charsmax(szTokenHeader), "Bearer %s", g_szBridgeToken);
-                grip_options_add_header(g_gIncomingHeader, "Authorization", szTokenHeader);
-            }
 
             g_hPrintMessageForward = CreateMultiForward("matteramxx_print_message", ET_STOP, FP_STRING, FP_STRING, FP_STRING, FP_STRING);
 
@@ -397,11 +375,6 @@ public PrepareBridgeUrl()
 
 public plugin_end()
 {
-    if(grip_is_request_active(g_gripIncomingHandle))
-        grip_cancel_request(g_gripIncomingHandle);
-    if(grip_is_request_active(g_gripOutgoingHandle))
-        grip_cancel_request(g_gripOutgoingHandle);
-
     DestroyForward(g_hPrintMessageForward);
 }
 
@@ -414,14 +387,14 @@ public Task_JoinDelayDone()
         get_mapname(sMapName, charsmax(sMapName));
         formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_MAP_CHANGED", sMapName);
 
-        new GripJSONValue:gJson = grip_json_init_object();
-        grip_json_object_set_string(gJson, "text", szMessage);
-        grip_json_object_set_string(gJson, "username", g_szOutgoingSystemUsername);
+        new JSON:json = json_init_object();
+        json_object_set_string(json, "text", szMessage);
+        json_object_set_string(json, "username", g_szOutgoingSystemUsername);
         if(!empty(g_szSystemAvatarUrl))
-            grip_json_object_set_string(gJson, "avatar", g_szSystemAvatarUrl);
-        grip_json_object_set_string(gJson, "userid", SYSMES_ID);
+            json_object_set_string(json, "avatar", g_szSystemAvatarUrl);
+        json_object_set_string(json, "userid", SYSMES_ID);
 
-        send_message_rest(gJson, g_szGateway);
+        send_message_rest(json, g_szGateway);
     }
 }
 
@@ -435,7 +408,16 @@ public MatterConnectAPI()
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
         server_print("[DEBUG] %s::MatterConnectAPI() - Called", __BINARY__);
 
-    g_gripIncomingHandle = grip_request(g_szIncomingUri, Empty_GripBody, GripRequestTypeGet, "MatterIncomingMessage", g_gIncomingHeader);
+    new EzHttpOptions:ezIncomingHeader = ezhttp_create_options();
+
+    if(!empty(g_szBridgeToken))
+    {
+        new szTokenHeader[JSON_PARAMETER_LENGTH];
+        formatex(szTokenHeader, charsmax(szTokenHeader), "Bearer %s", g_szBridgeToken);
+        ezhttp_option_set_header(ezIncomingHeader, "Authorization", szTokenHeader);
+    }
+    
+    ezhttp_get(g_szIncomingUri, "MatterIncomingMessage", ezIncomingHeader);
 }
 
 public MatterRetryConnection()
@@ -447,27 +429,23 @@ public MatterRetryConnection()
     set_task(g_fRetryDelay, "MatterConnectAPI");
 }
 
-public MatterIncomingMessage()
+public MatterIncomingMessage(EzHttpRequest:request)
 {
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
         server_print("[DEBUG] %s::MatterIncomingMessage() - Called", __BINARY__);
 
-    if(grip_get_response_state() != GripResponseStateSuccessful)
+    if(ezhttp_get_error_code(request) != EZH_OK)
     {
         server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_CONN_FAILED");
         MatterRetryConnection();
         return;
     }
 
-    new sIncomingMessage[INCOMING_BUFFER_LENGTH], sJsonError[MESSAGE_LENGTH], GripJSONValue:gJson;
+    new sIncomingMessage[INCOMING_BUFFER_LENGTH], JSON:json;
 
-    grip_get_response_body_string(sIncomingMessage, charsmax(sIncomingMessage));
+    new EzJSON:requestHandle = ezhttp_parse_json_response(request);
 
-    replace_all(sIncomingMessage, charsmax(sIncomingMessage), "^%", ""); 
-
-    gJson = grip_json_parse_string(sIncomingMessage, sJsonError, charsmax(sJsonError));
-
-    if(!empty(sJsonError))
+    if(requestHandle == EzInvalid_JSON)
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
             server_print("[DEBUG] %s::MatterIncomingMessage() - Json Error", __BINARY__);
@@ -476,42 +454,48 @@ public MatterIncomingMessage()
         set_task(g_fRetryDelay, "MatterConnectAPI");
         return;
     }
+    
+    ezjson_serial_to_string(requestHandle, sIncomingMessage, charsmax(sIncomingMessage));
 
-    if(grip_json_get_type(gJson) == GripJSONObject)
+    replace_all(sIncomingMessage, charsmax(sIncomingMessage), "^%", "");
+
+    json = json_parse(sIncomingMessage);
+
+    if(json_get_type(json) == JSONObject)
     {
         new sErrorMessage[INCOMING_BUFFER_LENGTH];
-        grip_json_object_get_string(gJson, "message", sErrorMessage, charsmax(sErrorMessage));
+        json_object_get_string(json, "message", sErrorMessage, charsmax(sErrorMessage));
         server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_ERROR", sErrorMessage);
-        grip_destroy_json_value(gJson);
+        json_free(json);
         set_fail_state(sErrorMessage);
         return;
     }
 
-    for(new x = 0; x < grip_json_array_get_count(gJson); x++)
+    for(new x = 0; x < json_array_get_count(json); x++)
     {
         new szMessageGateway[MAX_NAME_LENGTH];
-        new GripJSONValue:jCurrentMessage = grip_json_array_get_value(gJson, x);
-        grip_json_object_get_string(jCurrentMessage, "gateway", szMessageGateway, charsmax(szMessageGateway));
+        new JSON:jCurrentMessage = json_array_get_value(json, x);
+        json_object_get_string(jCurrentMessage, "gateway", szMessageGateway, charsmax(szMessageGateway));
         if(!equali(g_szGateway, szMessageGateway))
             continue;
         
         new szMessageBody[MESSAGE_LENGTH], szUserName[MAX_NAME_LENGTH], szProtocol[MAX_NAME_LENGTH], szUserIdentifier[MAX_NAME_LENGTH];
-        grip_json_object_get_string(jCurrentMessage, "userid", szUserIdentifier, charsmax(szUserIdentifier));
+        json_object_get_string(jCurrentMessage, "userid", szUserIdentifier, charsmax(szUserIdentifier));
         if(equal(szUserIdentifier, SYSMES_ID))
         {
             server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_SYSMSG_NOT_SENT");
             continue;
         }
-        grip_json_object_get_string(jCurrentMessage, "text", szMessageBody, charsmax(szMessageBody));
-        grip_json_object_get_string(jCurrentMessage, "username", szUserName, charsmax(szUserName));
-        grip_json_object_get_string(jCurrentMessage, "protocol", szProtocol, charsmax(szProtocol));
+        json_object_get_string(jCurrentMessage, "text", szMessageBody, charsmax(szMessageBody));
+        json_object_get_string(jCurrentMessage, "username", szUserName, charsmax(szUserName));
+        json_object_get_string(jCurrentMessage, "protocol", szProtocol, charsmax(szProtocol));
 
         MatterPrintMessage(szMessageBody, szUserName, szProtocol, szUserIdentifier);
 
-        grip_destroy_json_value(jCurrentMessage);
+        json_free(jCurrentMessage);
     }
 
-    grip_destroy_json_value(gJson);
+    json_free(json);
 
     set_task(g_fIncomingUpdateTime, "MatterConnectAPI");
 }
@@ -729,10 +713,10 @@ public Event_SayMessage(iClient)
     if(g_bOutgoingNoRepeat)
         g_szLastMessages[iClient] = szMessage;
 
-    new GripJSONValue:gJson = grip_json_init_object();
+    new JSON:json = json_init_object();
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        server_print("[DEBUG] %s::Event_SayMessage() - Preparing gJson object.", __BINARY__);
+        server_print("[DEBUG] %s::Event_SayMessage() - Preparing json object.", __BINARY__);
     
     if(iClient)
     {
@@ -779,23 +763,23 @@ public Event_SayMessage(iClient)
                 server_print("[DEBUG] %s::Event_SayMessage() - Resulting avatar URL is %s.", __BINARY__, sAvatarUrlFull);
 
             if(!empty(sAvatarUrlFull))
-                grip_json_object_set_string(gJson, "avatar", sAvatarUrlFull);
+                json_object_set_string(json, "avatar", sAvatarUrlFull);
         }
         else if(!empty(g_szSystemAvatarUrl))
         {
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::Event_SayMessage() - The server sent this message.", __BINARY__);
-            grip_json_object_set_string(gJson, "avatar", g_szSystemAvatarUrl);
+            json_object_set_string(json, "avatar", g_szSystemAvatarUrl);
         }
     } 
 
-    grip_json_object_set_string(gJson, "text", szMessage);
-    grip_json_object_set_string(gJson, "username", (iClient) ? szUserName : g_szOutgoingSystemUsername);
-    grip_json_object_set_string(gJson, "userid", (iClient) ? sSteamId : "GAME_CONSOLE");
+    json_object_set_string(json, "text", szMessage);
+    json_object_set_string(json, "username", (iClient) ? szUserName : g_szOutgoingSystemUsername);
+    json_object_set_string(json, "userid", (iClient) ? sSteamId : "GAME_CONSOLE");
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
         server_print("[DEBUG] %s::Event_SayMessage() - I'm going to send the message.", __BINARY__);
-    send_message_rest(gJson, g_szGateway);
+    send_message_rest(json, g_szGateway);
 
     if(g_bOutgoingNoCopyBack)
         return PLUGIN_CONTINUE;
@@ -883,15 +867,15 @@ public Event_PlayerKilled(iClient, iAttacker)
 
     formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_KILLED", szUserName, szAttackerName);
 
-    new GripJSONValue:gJson = grip_json_init_object();
+    new JSON:json = json_init_object();
 
-    grip_json_object_set_string(gJson, "text", szMessage);
-    grip_json_object_set_string(gJson, "username", g_szOutgoingSystemUsername);
+    json_object_set_string(json, "text", szMessage);
+    json_object_set_string(json, "username", g_szOutgoingSystemUsername);
     if(!empty(g_szSystemAvatarUrl))
-        grip_json_object_set_string(gJson, "avatar", g_szSystemAvatarUrl);
-    grip_json_object_set_string(gJson, "userid", SYSMES_ID);
+        json_object_set_string(json, "avatar", g_szSystemAvatarUrl);
+    json_object_set_string(json, "userid", SYSMES_ID);
 
-    send_message_rest(gJson, g_szGateway);
+    send_message_rest(json, g_szGateway);
 }
 
 public send_message_custom(iPlugin, iParams)
@@ -905,33 +889,46 @@ public send_message_custom(iPlugin, iParams)
     new bool:bSystem = get_param(4) == 1;
     get_string(5, sGateway, charsmax(sGateway));
 
-    new GripJSONValue:gJson = grip_json_init_object();
+    new JSON:json = json_init_object();
 
-    grip_json_object_set_string(gJson, "text", szMessage);
-    grip_json_object_set_string(gJson, "username", empty(szUsername) ? g_szOutgoingSystemUsername : szUsername);
-    grip_json_object_set_string(gJson, "avatar", empty(szAvatar) ? g_szSystemAvatarUrl : szAvatar);
-    grip_json_object_set_string(gJson, "userid", bSystem ? SYSMES_ID : "");
+    json_object_set_string(json, "text", szMessage);
+    json_object_set_string(json, "username", empty(szUsername) ? g_szOutgoingSystemUsername : szUsername);
+    json_object_set_string(json, "avatar", empty(szAvatar) ? g_szSystemAvatarUrl : szAvatar);
+    json_object_set_string(json, "userid", bSystem ? SYSMES_ID : "");
 
-    send_message_rest(gJson, empty(sGateway) ? g_szGateway : sGateway);
+    send_message_rest(json, empty(sGateway) ? g_szGateway : sGateway);
 }
 
-public outgoing_message()
+public outgoing_message(EzHttpRequest:request)
 {
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
     {
-        server_print("[DEBUG] %s::Event_SayMessage() - I sent the message. Response State is %d", __BINARY__, grip_get_response_state());
+        server_print("[DEBUG] %s::Event_SayMessage() - I sent the message. Response State is %d", __BINARY__, ezhttp_get_error_code(request));
         new sResponse[INCOMING_BUFFER_LENGTH];
-        grip_get_response_body_string(sResponse, charsmax(sResponse));
-        server_print("[DEBUG] %s::Event_SayMessage() - Server said: %s", __BINARY__, sResponse);
+        new EzJSON:requestHandle = ezhttp_parse_json_response(request);
+
+        if (requestHandle == EzInvalid_JSON)
+        {
+            server_print("[DEBUG] %s::Event_SayMessage() - Json Error", __BINARY__);
+            return;
+        }
+        else
+        {
+            ezjson_serial_to_string(requestHandle, sResponse, charsmax(sResponse));
+            server_print("[DEBUG] %s::Event_SayMessage() - Server said: %s", __BINARY__, sResponse);
+        }
+        
     }
 
-    if(grip_get_response_state() != GripResponseStateSuccessful)
+    if(ezhttp_get_error_code(request) != EZH_OK)
     {
         server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_MSG_FAILED"); //to do: why?
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
         {
             new sIncomingMessage[MESSAGE_LENGTH];
-            grip_get_response_body_string(sIncomingMessage, charsmax(sIncomingMessage));
+            new EzJSON:requestHandle = ezhttp_parse_json_response(request);
+            server_print("JSON is: %d", requestHandle);
+            ezjson_serial_to_string(requestHandle, sIncomingMessage, charsmax(sIncomingMessage));
             server_print(sIncomingMessage);
         }
     }
@@ -983,14 +980,14 @@ HandleDisconnectEvent(iClient)
             formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_LEFT", szUserName);
         g_bUserConnected[iClient] = false;
         
-        new GripJSONValue:gJson = grip_json_init_object();
-        grip_json_object_set_string(gJson, "text", szMessage);
-        grip_json_object_set_string(gJson, "username", g_szOutgoingSystemUsername);
+        new JSON:json = json_init_object();
+        json_object_set_string(json, "text", szMessage);
+        json_object_set_string(json, "username", g_szOutgoingSystemUsername);
         if(!empty(g_szSystemAvatarUrl))
-            grip_json_object_set_string(gJson, "avatar", g_szSystemAvatarUrl);
-        grip_json_object_set_string(gJson, "userid", SYSMES_ID);
+            json_object_set_string(json, "avatar", g_szSystemAvatarUrl);
+        json_object_set_string(json, "userid", SYSMES_ID);
 
-        send_message_rest(gJson, g_szGateway);
+        send_message_rest(json, g_szGateway);
     }
 }
 
@@ -1015,14 +1012,14 @@ public client_putinserver(id)
         g_bUserConnected[id] = true;
         g_szLastMessages[id] = "";
         
-        new GripJSONValue:gJson = grip_json_init_object();
-        grip_json_object_set_string(gJson, "text", szMessage);
-        grip_json_object_set_string(gJson, "username", g_szOutgoingSystemUsername);
+        new JSON:json = json_init_object();
+        json_object_set_string(json, "text", szMessage);
+        json_object_set_string(json, "username", g_szOutgoingSystemUsername);
         if(!empty(g_szSystemAvatarUrl))
-            grip_json_object_set_string(gJson, "avatar", g_szSystemAvatarUrl);
-        grip_json_object_set_string(gJson, "userid", SYSMES_ID);
+            json_object_set_string(json, "avatar", g_szSystemAvatarUrl);
+        json_object_set_string(json, "userid", SYSMES_ID);
 
-        send_message_rest(gJson, g_szGateway);
+        send_message_rest(json, g_szGateway);
     }
 }
 
@@ -1127,17 +1124,29 @@ stock url_encode(const sString[], sResult[], len)
     }
 }
 
-stock send_message_rest(GripJSONValue:gJson, const gateway[])
+stock send_message_rest(JSON:json, const gateway[])
 {
-    grip_json_object_set_string(gJson, "gateway", gateway);
-    grip_json_object_set_string(gJson, "protocol", g_szGamename);
+    json_object_set_string(json, "gateway", gateway);
+    json_object_set_string(json, "protocol", g_szGamename);
 
-    new GripBody:gPayload = grip_body_from_json(gJson);
+    new szPayload[MESSAGE_LENGTH];
+    json_serial_to_string(json, szPayload, charsmax(szPayload));
 
-    g_gripOutgoingHandle = grip_request(g_szOutgoingUri, gPayload, GripRequestTypePost, "outgoing_message", g_gOutgoingHeader);
+    new EzHttpOptions:ezOutgoingHeader = ezhttp_create_options();
 
-    grip_destroy_body(gPayload);
-    grip_destroy_json_value(gJson);
+    ezhttp_option_set_header(ezOutgoingHeader, "Content-Type", "application/json");
+
+    if(!empty(g_szBridgeToken))
+    {
+        new szTokenHeader[JSON_PARAMETER_LENGTH];
+        formatex(szTokenHeader, charsmax(szTokenHeader), "Bearer %s", g_szBridgeToken);
+        ezhttp_option_set_header(ezOutgoingHeader, "Authorization", szTokenHeader);
+    }
+
+    ezhttp_option_set_body(ezOutgoingHeader, szPayload);
+    ezhttp_post(g_szOutgoingUri, "outgoing_message", ezOutgoingHeader);
+
+    json_free(json);
 }
 
 stock is_valid_authid(authid[]) 
