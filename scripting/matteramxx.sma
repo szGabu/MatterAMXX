@@ -62,11 +62,13 @@ new g_cvarIncoming_RefreshTime;
 new g_cvarOutgoing;
 new g_cvarOutgoing_SystemUsername;
 new g_cvarOutgoing_Chat_Mode;
-new g_cvarOutgoing_Chat_NoCopyBack;
+new g_cvarOutgoing_Chat_Passthrough;
 new g_cvarOutgoing_Chat_SpamFil;
 new g_cvarOutgoing_Chat_ZeroifyAtSign;
 new g_cvarOutgoing_Chat_RequirePrefix;
 new g_cvarOutgoing_Chat_MuteServer;
+new g_cvarOutgoing_Chat_IgnoreBots;
+new g_cvarOutgoing_Chat_IgnoreHLTV;
 new g_cvarForcePrefix;
 new g_cvarOutgoing_Kills;
 new g_cvarOutgoing_Join;
@@ -101,11 +103,13 @@ new bool:g_bIncomingRelayMessagesOnUser = false;
 new bool:g_bOutgoingMessages = false;
 new g_szOutgoingSystemUsername[MAX_NAME_LENGTH];
 new g_iOutgoingChatMode = 0;
-new bool:g_bOutgoingNoCopyBack = false;
+new bool:g_bOutgoingPassthrough = false;
 new bool:g_bOutgoingNoRepeat = false;
 new bool:g_bOutgoingZwspAt = false;
 new g_szOutgoingRequirePrefix[SHORT_LENGTH];
 new bool:g_bOutgoingMuteServer = false;
+new bool:g_bOutgoingIgnoreBots = false;
+new bool:g_bOutgoingIgnoreHLTV = false;
 new g_szForcePrefix[MAX_NAME_LENGTH];
 new bool:g_bOutgoingKills = false;
 new bool:g_bOutgoingJoin = false;
@@ -227,11 +231,13 @@ public plugin_init()
     g_cvarOutgoing = create_cvar(                           "amx_matter_bridge_outgoing",                           "1",                                                  FCVAR_NONE,       "Enables outgoing messages (server to protocols).");
     g_cvarOutgoing_SystemUsername = create_cvar(            "amx_matter_bridge_outgoing_system_username",           szServerName,                                         FCVAR_NONE,       "For outgoing messages. Name of the 'user' when relying system messages.");
     g_cvarOutgoing_Chat_Mode = create_cvar(                 "amx_matter_bridge_outgoing_chat_mode",                 "3",                                                  FCVAR_NONE,       "For outgoing messages. Select which chat messages you want to send. (1=All chat 2=Team chat) You must sum the values you want to send. For example, if you want to send everything the value must be 3.");
-    g_cvarOutgoing_Chat_NoCopyBack = create_cvar(           "amx_matter_bridge_outgoing_chat_no_copyback",          "1",                                                  FCVAR_NONE,       "For outgoing messages. Prevents the plugin from re-printing a message that comes from within.");
+    g_cvarOutgoing_Chat_Passthrough = create_cvar(          "amx_matter_bridge_outgoing_chat_passthrough",          "0",                                                  FCVAR_NONE,       "For outgoing messages. Whenever a message is sent to the bridge, it will pass through and reprinted by the plugin.");
     g_cvarOutgoing_Chat_SpamFil = create_cvar(              "amx_matter_bridge_outgoing_chat_no_repeat",            "1",                                                  FCVAR_NONE,       "For outgoing messages. Implement basic anti-spam filter. Useful for preventing taunt binds from sending multiple times.");
     g_cvarOutgoing_Chat_ZeroifyAtSign = create_cvar(        "amx_matter_bridge_outgoing_chat_zwsp_at",              "1",                                                  FCVAR_NONE,       "For outgoing messages. This controls if the plugin should add a ZWSP character after the at symbol (@) to prevent unintentional or malicious pinging.");
     g_cvarOutgoing_Chat_RequirePrefix = create_cvar(        "amx_matter_bridge_outgoing_chat_require_prefix",       "",                                                   FCVAR_NONE,       "For outgoing messages. Messages need this prefix to be able to be sent. Regex compatible.");
     g_cvarOutgoing_Chat_MuteServer = create_cvar(           "amx_matter_bridge_outgoing_chat_mute_server",          "0",                                                  FCVAR_NONE,       "For outgoing messages. When an user talks (and the message goes through the bridge) it will not be sent to other players. Works better with 'amx_matter_bridge_outgoing_chat_require_prefix' enabled.");
+    g_cvarOutgoing_Chat_IgnoreBots = create_cvar(           "amx_matter_bridge_outgoing_ignore_bots",               "0",                                                  FCVAR_NONE,       "For outgoing messages. For messages and events, anything coming from bots will be ignored. (Kills made by bots will be suppressed, but users killing bots will not).");
+    g_cvarOutgoing_Chat_IgnoreHLTV = create_cvar(           "amx_matter_bridge_outgoing_ignore_hltv",               "1",                                                  FCVAR_NONE,       "For outgoing messages. For messages and events, anything coming from a HLTV proxy will be ignored.");
     g_cvarOutgoing_Kills = create_cvar(                     "amx_matter_bridge_outgoing_kills",                     "1",                                                  FCVAR_NONE,       "For outgoing messages. Transmit kill feed. It's recommended that you to turn it off on heavy activity servers (Like CSDM/Half-Life servers with tons of players).");
     g_cvarOutgoing_Join = create_cvar(                      "amx_matter_bridge_outgoing_join",                      "1",                                                  FCVAR_NONE,       "For outgoing messages. Transmit when people join the server.");
     g_cvarOutgoing_Join_Delay = create_cvar(                "amx_matter_bridge_outgoing_join_delay",                "15",                                                 FCVAR_NONE,       "For outgoing messages. Specify how many seconds the server has to wait before sending Join messages.");
@@ -277,11 +283,13 @@ public OnConfigsExecuted()
     bind_pcvar_num(g_cvarOutgoing, g_bOutgoingMessages);
     bind_pcvar_string(g_cvarOutgoing_SystemUsername, g_szOutgoingSystemUsername, charsmax(g_szOutgoingSystemUsername));
     bind_pcvar_num(g_cvarOutgoing_Chat_Mode, g_iOutgoingChatMode);
-    bind_pcvar_num(g_cvarOutgoing_Chat_NoCopyBack, g_bOutgoingNoCopyBack);
+    bind_pcvar_num(g_cvarOutgoing_Chat_Passthrough, g_bOutgoingPassthrough);
     bind_pcvar_num(g_cvarOutgoing_Chat_SpamFil, g_bOutgoingNoRepeat);
     bind_pcvar_num(g_cvarOutgoing_Chat_ZeroifyAtSign, g_bOutgoingZwspAt);
     bind_pcvar_string(g_cvarOutgoing_Chat_RequirePrefix, g_szOutgoingRequirePrefix, charsmax(g_szOutgoingRequirePrefix));
     bind_pcvar_num(g_cvarOutgoing_Chat_MuteServer, g_bOutgoingMuteServer);
+    bind_pcvar_num(g_cvarOutgoing_Chat_IgnoreBots, g_bOutgoingIgnoreBots);
+    bind_pcvar_num(g_cvarOutgoing_Chat_IgnoreHLTV, g_bOutgoingIgnoreHLTV);
     bind_pcvar_num(g_cvarOutgoing_Kills, g_bOutgoingKills);
     bind_pcvar_num(g_cvarOutgoing_Join, g_bOutgoingJoin);
     bind_pcvar_float(g_cvarOutgoing_Join_Delay, g_fOutgoingJoinDelay);
@@ -680,6 +688,12 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
 
 public Event_SayMessage(iClient)
 {
+    if(is_user_bot(iClient) && g_bOutgoingIgnoreBots)
+        return PLUGIN_CONTINUE;
+
+    if(is_user_hltv(iClient) && g_bOutgoingIgnoreHLTV)
+        return PLUGIN_CONTINUE;
+
     new szMessage[MESSAGE_LENGTH], szUserName[MAX_NAME_LENGTH], sSteamId[MAX_NAME_LENGTH];
     read_args(szMessage, charsmax(szMessage));
 
@@ -780,9 +794,7 @@ public Event_SayMessage(iClient)
         server_print("[DEBUG] %s::Event_SayMessage() - I'm going to send the message.", __BINARY__);
     send_message_rest(json, g_szGateway);
 
-    if(g_bOutgoingNoCopyBack)
-        return PLUGIN_CONTINUE;
-    else 
+    if(g_bOutgoingPassthrough)
     {
         if(g_bIncomingRelayMessagesOnUser)
         {
@@ -827,6 +839,8 @@ public Event_SayMessage(iClient)
             return PLUGIN_HANDLED;
         }
     }
+    else
+        return PLUGIN_CONTINUE;
 }
 
 public Event_PlayerKilledEV()
@@ -853,6 +867,12 @@ public Event_PlayerKilled(iClient, iAttacker)
 
     if(is_user_connected(iAttacker))
     {
+        if(is_user_bot(iAttacker) && g_bOutgoingIgnoreBots)
+            return;
+
+        if(is_user_hltv(iAttacker) && g_bOutgoingIgnoreHLTV)
+            return;
+            
         if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
             get_colorless_name(iAttacker, szAttackerName, charsmax(szAttackerName));
         else
@@ -965,6 +985,12 @@ HandleDisconnectEvent(iClient)
     g_bUserAuthenticated[iClient] = 0;
     if(!g_bIsIntermission && g_bOutgoingLeave && !is_user_bot(iClient) && g_bUserConnected[iClient])
     {
+        if(is_user_bot(iClient) && g_bOutgoingIgnoreBots)
+            return;
+
+        if(is_user_hltv(iClient) && g_bOutgoingIgnoreHLTV)
+            return;
+            
         new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
         if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
             get_colorless_name(iClient, szUserName, charsmax(szUserName));
@@ -991,8 +1017,14 @@ HandleDisconnectEvent(iClient)
 
 public client_putinserver(id)
 {
-    if(g_bJoinDelayDone && g_bOutgoingJoin && !is_user_bot(id))
+    if(g_bJoinDelayDone && g_bOutgoingJoin)
     {
+        if(is_user_bot(id) && g_bOutgoingIgnoreBots)
+            return;
+
+        if(is_user_hltv(id) && g_bOutgoingIgnoreHLTV)
+            return;
+
         new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
 
         if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
