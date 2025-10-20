@@ -141,8 +141,8 @@ new g_iPluginFlags;
 
 new g_hSayTextUserMessage;
 
-new Regex:g_rAuthId_Pattern;
-new Regex:g_rPrefix_Pattern;
+new Regex:g_hAuthId_Pattern;
+new Regex:g_hPrefix_Pattern;
 
 new const sHexTable[] = "0123456789ABCDEF";
 
@@ -188,7 +188,7 @@ public plugin_natives()
 public plugin_init()
 {
     //always compile regex on map init to avoid errors
-    g_rAuthId_Pattern = regex_compile(REGEX_STEAMID_PATTERN);
+    g_hAuthId_Pattern = regex_compile(REGEX_STEAMID_PATTERN);
     
     register_plugin(MATTERAMXX_PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR);
 
@@ -353,7 +353,7 @@ public OnConfigsExecuted()
             set_task(g_fIncomingUpdateTime, "MatterConnectAPI");
 
             if(!empty(g_szIncomingIgnorePrefix))
-                g_rPrefix_Pattern = regex_compile(g_szIncomingIgnorePrefix);
+                g_hPrefix_Pattern = regex_compile(g_szIncomingIgnorePrefix);
         }
 
         g_iPluginFlags = plugin_flags();
@@ -394,14 +394,14 @@ public Task_JoinDelayDone()
         get_mapname(sMapName, charsmax(sMapName));
         formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_MAP_CHANGED", sMapName);
 
-        new EzJSON:json = ezjson_init_object();
-        ezjson_object_set_string(json, "text", szMessage);
-        ezjson_object_set_string(json, "username", g_szOutgoingSystemUsername);
+        new EzJSON:hJson = ezjson_init_object();
+        ezjson_object_set_string(hJson, "text", szMessage);
+        ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
         if(!empty(g_szSystemAvatarUrl))
-            ezjson_object_set_string(json, "avatar", g_szSystemAvatarUrl);
-        ezjson_object_set_string(json, "userid", SYSMES_ID);
+            ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
+        ezjson_object_set_string(hJson, "userid", SYSMES_ID);
 
-        send_message_rest(json, g_szGateway);
+        send_message_rest(hJson, g_szGateway);
     }
 }
 
@@ -448,11 +448,11 @@ public MatterIncomingMessage(EzHttpRequest:request)
         return;
     }
 
-    new sIncomingMessage[INCOMING_BUFFER_LENGTH], EzJSON:json;
+    new szIncomingMessage[INCOMING_BUFFER_LENGTH], EzJSON:hJson;
 
-    new EzJSON:requestHandle = ezhttp_parse_json_response(request);
+    new EzJSON:hRequestHandle = ezhttp_parse_json_response(request);
 
-    if(requestHandle == EzInvalid_JSON)
+    if(hRequestHandle == EzInvalid_JSON)
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
             server_print("[DEBUG] %s::MatterIncomingMessage() - Json Error", __BINARY__);
@@ -462,47 +462,47 @@ public MatterIncomingMessage(EzHttpRequest:request)
         return;
     }
     
-    ezjson_serial_to_string(requestHandle, sIncomingMessage, charsmax(sIncomingMessage));
+    ezjson_serial_to_string(hRequestHandle, szIncomingMessage, charsmax(szIncomingMessage));
 
-    replace_all(sIncomingMessage, charsmax(sIncomingMessage), "^%", "");
+    replace_all(szIncomingMessage, charsmax(szIncomingMessage), "^%", "");
 
-    json = ezjson_parse(sIncomingMessage);
+    hJson = ezjson_parse(szIncomingMessage);
 
-    if(ezjson_get_type(json) == EzJSONObject)
+    if(ezjson_get_type(hJson) == EzJSONObject)
     {
         new sErrorMessage[INCOMING_BUFFER_LENGTH];
-        ezjson_object_get_string(json, "message", sErrorMessage, charsmax(sErrorMessage));
+        ezjson_object_get_string(hJson, "message", sErrorMessage, charsmax(sErrorMessage));
         server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_ERROR", sErrorMessage);
-        ezjson_free(json);
+        ezjson_free(hJson);
         set_fail_state(sErrorMessage);
         return;
     }
 
-    for(new x = 0; x < ezjson_array_get_count(json); x++)
+    for(new x = 0; x < ezjson_array_get_count(hJson); x++)
     {
         new szMessageGateway[MAX_NAME_LENGTH];
-        new EzJSON:jCurrentMessage = ezjson_array_get_value(json, x);
-        ezjson_object_get_string(jCurrentMessage, "gateway", szMessageGateway, charsmax(szMessageGateway));
+        new EzJSON:hCurrentMessage = ezjson_array_get_value(hJson, x);
+        ezjson_object_get_string(hCurrentMessage, "gateway", szMessageGateway, charsmax(szMessageGateway));
         if(!equali(g_szGateway, szMessageGateway))
             continue;
         
         new szMessageBody[MESSAGE_LENGTH], szUserName[MAX_NAME_LENGTH], szProtocol[MAX_NAME_LENGTH], szUserIdentifier[MAX_NAME_LENGTH];
-        ezjson_object_get_string(jCurrentMessage, "userid", szUserIdentifier, charsmax(szUserIdentifier));
+        ezjson_object_get_string(hCurrentMessage, "userid", szUserIdentifier, charsmax(szUserIdentifier));
         if(equal(szUserIdentifier, SYSMES_ID))
         {
             server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_SYSMSG_NOT_SENT");
             continue;
         }
-        ezjson_object_get_string(jCurrentMessage, "text", szMessageBody, charsmax(szMessageBody));
-        ezjson_object_get_string(jCurrentMessage, "username", szUserName, charsmax(szUserName));
-        ezjson_object_get_string(jCurrentMessage, "protocol", szProtocol, charsmax(szProtocol));
+        ezjson_object_get_string(hCurrentMessage, "text", szMessageBody, charsmax(szMessageBody));
+        ezjson_object_get_string(hCurrentMessage, "username", szUserName, charsmax(szUserName));
+        ezjson_object_get_string(hCurrentMessage, "protocol", szProtocol, charsmax(szProtocol));
 
         MatterPrintMessage(szMessageBody, szUserName, szProtocol, szUserIdentifier);
 
-        ezjson_free(jCurrentMessage);
+        ezjson_free(hCurrentMessage);
     }
 
-    ezjson_free(json);
+    ezjson_free(hJson);
 
     set_task(g_fIncomingUpdateTime, "MatterConnectAPI");
 }
@@ -694,7 +694,7 @@ public Event_SayMessage(iClient)
     if(is_user_hltv(iClient) && g_bOutgoingIgnoreHLTV)
         return PLUGIN_CONTINUE;
 
-    new szMessage[MESSAGE_LENGTH], szUserName[MAX_NAME_LENGTH], sSteamId[MAX_NAME_LENGTH];
+    new szMessage[MESSAGE_LENGTH], szUserName[MAX_NAME_LENGTH], szSteamId[MAX_NAME_LENGTH];
     read_args(szMessage, charsmax(szMessage));
 
     remove_quotes(szMessage);
@@ -726,7 +726,7 @@ public Event_SayMessage(iClient)
     if(g_bOutgoingNoRepeat)
         g_szLastMessages[iClient] = szMessage;
 
-    new EzJSON:json = ezjson_init_object();
+    new EzJSON:hJson = ezjson_init_object();
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
         server_print("[DEBUG] %s::Event_SayMessage() - Preparing json object.", __BINARY__);
@@ -740,15 +740,15 @@ public Event_SayMessage(iClient)
         else
             get_user_name(iClient, szUserName, charsmax(szUserName));
 
-        get_user_info(iClient, "*sid", sSteamId, charsmax(sSteamId));
+        get_user_info(iClient, "*sid", szSteamId, charsmax(szSteamId));
 
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
         {
             server_print("[DEBUG] %s::Event_SayMessage() - Fullname is %s.", __BINARY__, szUserName);
-            server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is %s.", __BINARY__, sSteamId);
+            server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is %s.", __BINARY__, szSteamId);
         }
 
-        if(!empty(sSteamId))
+        if(!empty(szSteamId))
         {
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is from a player.", __BINARY__);
@@ -758,7 +758,7 @@ public Event_SayMessage(iClient)
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
                     server_print("[DEBUG] %s::Event_SayMessage() - User is authenticated.", __BINARY__);
                 if(!empty(g_szAvatarUrl))
-                    formatex(sAvatarUrlFull, charsmax(sAvatarUrlFull), g_szAvatarUrl, sSteamId);
+                    formatex(sAvatarUrlFull, charsmax(sAvatarUrlFull), g_szAvatarUrl, szSteamId);
             }
             else
             {
@@ -776,23 +776,23 @@ public Event_SayMessage(iClient)
                 server_print("[DEBUG] %s::Event_SayMessage() - Resulting avatar URL is %s.", __BINARY__, sAvatarUrlFull);
 
             if(!empty(sAvatarUrlFull))
-                ezjson_object_set_string(json, "avatar", sAvatarUrlFull);
+                ezjson_object_set_string(hJson, "avatar", sAvatarUrlFull);
         }
         else if(!empty(g_szSystemAvatarUrl))
         {
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::Event_SayMessage() - The server sent this message.", __BINARY__);
-            ezjson_object_set_string(json, "avatar", g_szSystemAvatarUrl);
+            ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
         }
     } 
 
-    ezjson_object_set_string(json, "text", szMessage);
-    ezjson_object_set_string(json, "username", (iClient) ? szUserName : g_szOutgoingSystemUsername);
-    ezjson_object_set_string(json, "userid", (iClient) ? sSteamId : "GAME_CONSOLE");
+    ezjson_object_set_string(hJson, "text", szMessage);
+    ezjson_object_set_string(hJson, "username", (iClient) ? szUserName : g_szOutgoingSystemUsername);
+    ezjson_object_set_string(hJson, "userid", (iClient) ? szSteamId : "GAME_CONSOLE");
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
         server_print("[DEBUG] %s::Event_SayMessage() - I'm going to send the message.", __BINARY__);
-    send_message_rest(json, g_szGateway);
+    send_message_rest(hJson, g_szGateway);
 
     if(g_bOutgoingPassthrough)
     {
@@ -886,15 +886,15 @@ public Event_PlayerKilled(iClient, iAttacker)
 
     formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_KILLED", szUserName, szAttackerName);
 
-    new EzJSON:json = ezjson_init_object();
+    new EzJSON:hJson = ezjson_init_object();
 
-    ezjson_object_set_string(json, "text", szMessage);
-    ezjson_object_set_string(json, "username", g_szOutgoingSystemUsername);
+    ezjson_object_set_string(hJson, "text", szMessage);
+    ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
     if(!empty(g_szSystemAvatarUrl))
-        ezjson_object_set_string(json, "avatar", g_szSystemAvatarUrl);
-    ezjson_object_set_string(json, "userid", SYSMES_ID);
+        ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
+    ezjson_object_set_string(hJson, "userid", SYSMES_ID);
 
-    send_message_rest(json, g_szGateway);
+    send_message_rest(hJson, g_szGateway);
 }
 
 public send_message_custom(iPlugin, iParams)
@@ -908,56 +908,56 @@ public send_message_custom(iPlugin, iParams)
     new bool:bSystem = get_param(4) == 1;
     get_string(5, sGateway, charsmax(sGateway));
 
-    new EzJSON:json = ezjson_init_object();
+    new EzJSON:hJson = ezjson_init_object();
 
-    ezjson_object_set_string(json, "text", szMessage);
-    ezjson_object_set_string(json, "username", empty(szUsername) ? g_szOutgoingSystemUsername : szUsername);
-    ezjson_object_set_string(json, "avatar", empty(szAvatar) ? g_szSystemAvatarUrl : szAvatar);
-    ezjson_object_set_string(json, "userid", bSystem ? SYSMES_ID : "");
+    ezjson_object_set_string(hJson, "text", szMessage);
+    ezjson_object_set_string(hJson, "username", empty(szUsername) ? g_szOutgoingSystemUsername : szUsername);
+    ezjson_object_set_string(hJson, "avatar", empty(szAvatar) ? g_szSystemAvatarUrl : szAvatar);
+    ezjson_object_set_string(hJson, "userid", bSystem ? SYSMES_ID : "");
 
-    send_message_rest(json, empty(sGateway) ? g_szGateway : sGateway);
+    send_message_rest(hJson, empty(sGateway) ? g_szGateway : sGateway);
 }
 
-public outgoing_message(EzHttpRequest:request)
+public outgoing_message(EzHttpRequest:hRequest)
 {
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
     {
-        server_print("[DEBUG] %s::Event_SayMessage() - I sent the message. Response State is %d", __BINARY__, ezhttp_get_error_code(request));
+        server_print("[DEBUG] %s::Event_SayMessage() - I sent the message. Response State is %d", __BINARY__, ezhttp_get_error_code(hRequest));
         new sResponse[INCOMING_BUFFER_LENGTH];
-        new EzJSON:requestHandle = ezhttp_parse_json_response(request);
+        new EzJSON:hRequestHandle = ezhttp_parse_json_response(hRequest);
 
-        if (requestHandle == EzInvalid_JSON)
+        if (hRequestHandle == EzInvalid_JSON)
         {
             server_print("[DEBUG] %s::Event_SayMessage() - Json Error", __BINARY__);
             return;
         }
         else
         {
-            ezjson_serial_to_string(requestHandle, sResponse, charsmax(sResponse));
+            ezjson_serial_to_string(hRequestHandle, sResponse, charsmax(sResponse));
             server_print("[DEBUG] %s::Event_SayMessage() - Server said: %s", __BINARY__, sResponse);
         }
         
     }
 
-    if(ezhttp_get_error_code(request) != EZH_OK)
+    if(ezhttp_get_error_code(hRequest) != EZH_OK)
     {
         server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_MSG_FAILED"); //to do: why?
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
         {
-            new sIncomingMessage[MESSAGE_LENGTH];
-            new EzJSON:requestHandle = ezhttp_parse_json_response(request);
-            ezjson_serial_to_string(requestHandle, sIncomingMessage, charsmax(sIncomingMessage));
-            server_print(sIncomingMessage);
+            new szIncomingMessage[MESSAGE_LENGTH];
+            new EzJSON:hRequestHandle = ezhttp_parse_json_response(hRequest);
+            ezjson_serial_to_string(hRequestHandle, szIncomingMessage, charsmax(szIncomingMessage));
+            server_print(szIncomingMessage);
         }
     }
 }
 
-public client_authorized(id)
+public client_authorized(iClient)
 {
-    new authid[32];
-    get_user_authid(id, authid, charsmax(authid));
-    if(is_valid_authid(authid))
-        g_bUserAuthenticated[id] = 1;
+    new szAuthId[MAX_AUTHID_LENGTH];
+    get_user_authid(iClient, szAuthId, charsmax(szAuthId));
+    if(is_valid_authid(szAuthId))
+        g_bUserAuthenticated[iClient] = 1;
 }
 
 #if USE_DEPRECATED_DISCONNECT_FORWARD
@@ -1004,33 +1004,33 @@ HandleDisconnectEvent(iClient)
             formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_LEFT", szUserName);
         g_bUserConnected[iClient] = false;
         
-        new EzJSON:json = ezjson_init_object();
-        ezjson_object_set_string(json, "text", szMessage);
-        ezjson_object_set_string(json, "username", g_szOutgoingSystemUsername);
+        new EzJSON:hJson = ezjson_init_object();
+        ezjson_object_set_string(hJson, "text", szMessage);
+        ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
         if(!empty(g_szSystemAvatarUrl))
-            ezjson_object_set_string(json, "avatar", g_szSystemAvatarUrl);
-        ezjson_object_set_string(json, "userid", SYSMES_ID);
+            ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
+        ezjson_object_set_string(hJson, "userid", SYSMES_ID);
 
-        send_message_rest(json, g_szGateway);
+        send_message_rest(hJson, g_szGateway);
     }
 }
 
-public client_putinserver(id)
+public client_putinserver(iClient)
 {
     if(g_bJoinDelayDone && g_bOutgoingJoin)
     {
-        if(is_user_bot(id) && g_bOutgoingIgnoreBots)
+        if(is_user_bot(iClient) && g_bOutgoingIgnoreBots)
             return;
 
-        if(is_user_hltv(id) && g_bOutgoingIgnoreHLTV)
+        if(is_user_hltv(iClient) && g_bOutgoingIgnoreHLTV)
             return;
 
         new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
 
         if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
-            get_colorless_name(id, szUserName, charsmax(szUserName));
+            get_colorless_name(iClient, szUserName, charsmax(szUserName));
         else
-            get_user_name(id, szUserName, charsmax(szUserName));
+            get_user_name(iClient, szUserName, charsmax(szUserName));
 
         replace_all(szUserName, charsmax(szUserName), "^"", "");
 
@@ -1039,17 +1039,17 @@ public client_putinserver(id)
         else
             formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_JOINED", szUserName);
         
-        g_bUserConnected[id] = true;
-        g_szLastMessages[id] = "";
+        g_bUserConnected[iClient] = true;
+        g_szLastMessages[iClient] = "";
         
-        new EzJSON:json = ezjson_init_object();
-        ezjson_object_set_string(json, "text", szMessage);
-        ezjson_object_set_string(json, "username", g_szOutgoingSystemUsername);
+        new EzJSON:hJson = ezjson_init_object();
+        ezjson_object_set_string(hJson, "text", szMessage);
+        ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
         if(!empty(g_szSystemAvatarUrl))
-            ezjson_object_set_string(json, "avatar", g_szSystemAvatarUrl);
-        ezjson_object_set_string(json, "userid", SYSMES_ID);
+            ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
+        ezjson_object_set_string(hJson, "userid", SYSMES_ID);
 
-        send_message_rest(json, g_szGateway);
+        send_message_rest(hJson, g_szGateway);
     }
 }
 
@@ -1080,87 +1080,87 @@ stock get_suitable_target()
     return 0;
 }
 
-stock empty(const string[])
+stock empty(const szString[])
 {
-    return !string[0];
+    return !szString[0];
 }
 
 //thanks to YaLTeR
-stock get_colorless_name(id, name[], len)
+stock get_colorless_name(iClient, szName[], iLen)
 {
-	get_user_name(id, name, len);
+	get_user_name(iClient, szName, iLen);
 
 	// Clear out color codes
 	new i, j;
 	new const hat[3] = "^^";
-	while(name[i])
+	while(szName[i])
 	{
-		if(name[i] == hat[0] && name[i + 1] >= '0' && name[i + 1] <= '9')
+		if(szName[i] == hat[0] && szName[i + 1] >= '0' && szName[i + 1] <= '9')
 		{
 			i++;
 		}
 		else
 		{
 			if(j != i)
-				name[j] = name[i];
+				szName[j] = szName[i];
 			j++;
 		}
 		i++;
 	}
-	name[j] = 0;
+	szName[j] = 0;
 }
 
 //thanks to Th3-822
-stock url_encode(const sString[], sResult[], len)
+stock url_encode(const szString[], szResult[], iLen)
 {
     new from, c, to;
 
-    while(from < len)
+    while(from < iLen)
     {
-        c = sString[from++];
+        c = szString[from++];
         if(c == 0)
         {
-            sResult[to++] = c;
+            szResult[to++] = c;
             break;
         }
         else if(c == ' ')
         {
-            sResult[to++] = '_';
+            szResult[to++] = '_';
         }
         else if(!(0 <= c <= 255))
         { // UTF-8 Fix (Doesn't encode put .)
-            sResult[to++] = '_';
+            szResult[to++] = '_';
         }
         else if((c < '0' && c != '-' && c != '.') ||
                 (c < 'A' && c > '9') ||
                 (c > 'Z' && c < 'a' && c != '_') ||
                 (c > 'z'))
         {
-            if((to + 3) > len)
+            if((to + 3) > iLen)
             {
-                sResult[to] = 0;
+                szResult[to] = 0;
                 break;
             }
             // UTF-8 Fix - Need to check real c values.
             /* if(c < 0) c = 256 + c; */
-            sResult[to++] = '_';
-            sResult[to++] = sHexTable[c >> 4];
-            sResult[to++] = sHexTable[c & 15];
+            szResult[to++] = '_';
+            szResult[to++] = sHexTable[c >> 4];
+            szResult[to++] = sHexTable[c & 15];
         }
         else
         {
-            sResult[to++] = c;
+            szResult[to++] = c;
         }
     }
 }
 
-stock send_message_rest(EzJSON:json, const gateway[])
+stock send_message_rest(EzJSON:hJson, const szGateway[])
 {
-    ezjson_object_set_string(json, "gateway", gateway);
-    ezjson_object_set_string(json, "protocol", g_szGamename);
+    ezjson_object_set_string(hJson, "gateway", szGateway);
+    ezjson_object_set_string(hJson, "protocol", g_szGamename);
 
     new szPayload[MESSAGE_LENGTH];
-    ezjson_serial_to_string(json, szPayload, charsmax(szPayload));
+    ezjson_serial_to_string(hJson, szPayload, charsmax(szPayload));
 
     new EzHttpOptions:ezOutgoingHeader = ezhttp_create_options();
 
@@ -1176,15 +1176,15 @@ stock send_message_rest(EzJSON:json, const gateway[])
     ezhttp_option_set_body(ezOutgoingHeader, szPayload);
     ezhttp_post(g_szOutgoingUri, "outgoing_message", ezOutgoingHeader);
 
-    ezjson_free(json);
+    ezjson_free(hJson);
 }
 
-stock is_valid_authid(authid[]) 
+stock is_valid_authid(szAuthId[]) 
 {
-    return regex_match_c(authid, g_rAuthId_Pattern) > 0;
+    return regex_match_c(szAuthId, g_hAuthId_Pattern) > 0;
 }
 
-stock prefix_matches(const message[]) 
+stock prefix_matches(const szMessage[]) 
 {
-    return regex_match_c(message, g_rPrefix_Pattern) > 0;
+    return regex_match_c(szMessage, g_hPrefix_Pattern) > 0;
 }
