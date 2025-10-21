@@ -72,6 +72,7 @@ new g_cvarOutgoing_Chat_IgnoreHLTV;
 new g_cvarForcePrefix;
 new g_cvarOutgoing_Kills;
 new g_cvarOutgoing_Join;
+new g_cvarOutgoing_Join_Wait;
 new g_cvarOutgoing_Join_Delay;
 new g_cvarOutgoing_Quit;
 new g_cvarOutgoing_Quit_IgnoreIntermission;
@@ -113,6 +114,7 @@ new bool:g_bOutgoingIgnoreHLTV = false;
 new g_szForcePrefix[MAX_NAME_LENGTH];
 new bool:g_bOutgoingKills = false;
 new bool:g_bOutgoingJoin = false;
+new Float:g_fOutgoingJoinWait = 0.0;
 new Float:g_fOutgoingJoinDelay = 0.0;
 new bool:g_bOutgoingLeave = false;
 new bool:g_bOutgoingLeaveIgnoreIntermission = false;
@@ -240,6 +242,7 @@ public plugin_init()
     g_cvarOutgoing_Chat_IgnoreHLTV = create_cvar(           "amx_matter_bridge_outgoing_ignore_hltv",               "1",                                                  FCVAR_NONE,       "For outgoing messages. For messages and events, anything coming from a HLTV proxy will be ignored.");
     g_cvarOutgoing_Kills = create_cvar(                     "amx_matter_bridge_outgoing_kills",                     "1",                                                  FCVAR_NONE,       "For outgoing messages. Transmit kill feed. It's recommended that you to turn it off on heavy activity servers (Like CSDM/Half-Life servers with tons of players).");
     g_cvarOutgoing_Join = create_cvar(                      "amx_matter_bridge_outgoing_join",                      "1",                                                  FCVAR_NONE,       "For outgoing messages. Transmit when people join the server.");
+    g_cvarOutgoing_Join_Wait = create_cvar(                 "amx_matter_bridge_outgoing_join_wait",                 "3.0",                                                  FCVAR_NONE,       "For outgoing messages. Amount of time to wait for every individual player before sending their join message. Useful if you have a plugin blocking improper names and you want to show the message when their name is validated.");
     g_cvarOutgoing_Join_Delay = create_cvar(                "amx_matter_bridge_outgoing_join_delay",                "15",                                                 FCVAR_NONE,       "For outgoing messages. Specify how many seconds the server has to wait before sending Join messages.");
     g_cvarOutgoing_Quit = create_cvar(                      "amx_matter_bridge_outgoing_quit",                      "1",                                                  FCVAR_NONE,       "For outgoing messages. Transmit when people leave the server.");
     g_cvarOutgoing_Quit_IgnoreIntermission = create_cvar(   "amx_matter_bridge_outgoing_quit_ignore_intermission",  "0",                                                  FCVAR_NONE,       "For outgoing messages. Specify if the server shouldn't send quit messages if the server reached the intermission state (End of the Map).");
@@ -292,6 +295,7 @@ public OnConfigsExecuted()
     bind_pcvar_num(g_cvarOutgoing_Chat_IgnoreHLTV, g_bOutgoingIgnoreHLTV);
     bind_pcvar_num(g_cvarOutgoing_Kills, g_bOutgoingKills);
     bind_pcvar_num(g_cvarOutgoing_Join, g_bOutgoingJoin);
+    bind_pcvar_float(g_cvarOutgoing_Join_Wait, g_fOutgoingJoinWait);
     bind_pcvar_float(g_cvarOutgoing_Join_Delay, g_fOutgoingJoinDelay);
     bind_pcvar_num(g_cvarOutgoing_Quit, g_bOutgoingLeave);
     bind_pcvar_num(g_cvarOutgoing_Quit_IgnoreIntermission, g_bOutgoingLeaveIgnoreIntermission);
@@ -1017,40 +1021,55 @@ HandleDisconnectEvent(iClient)
 
 public client_putinserver(iClient)
 {
-    if(g_bJoinDelayDone && g_bOutgoingJoin)
+    if(g_bOutgoingJoin && g_bJoinDelayDone)
     {
-        if(is_user_bot(iClient) && g_bOutgoingIgnoreBots)
-            return;
-
-        if(is_user_hltv(iClient) && g_bOutgoingIgnoreHLTV)
-            return;
-
-        new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
-
-        if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
-            get_colorless_name(iClient, szUserName, charsmax(szUserName));
+        if(g_fOutgoingJoinWait > 0.0)
+            set_task(g_fOutgoingJoinWait, "client_putinserver_delayed", get_user_userid(iClient));
         else
-            get_user_name(iClient, szUserName, charsmax(szUserName));
-
-        replace_all(szUserName, charsmax(szUserName), "^"", "");
-
-        if(g_bOutgoingJoinQuitPlayerCount)
-            formatex(szMessage, charsmax(szMessage), "%L [%d/%d]", LANG_SERVER, "MATTERAMXX_MESSAGE_JOINED", szUserName, get_playersnum_ex(GetPlayers_ExcludeBots), get_maxplayers());
-        else
-            formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_JOINED", szUserName);
-        
-        g_bUserConnected[iClient] = true;
-        g_szLastMessages[iClient] = "";
-        
-        new EzJSON:hJson = ezjson_init_object();
-        ezjson_object_set_string(hJson, "text", szMessage);
-        ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
-        if(!empty(g_szSystemAvatarUrl))
-            ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
-        ezjson_object_set_string(hJson, "userid", SYSMES_ID);
-
-        send_message_rest(hJson, g_szGateway);
+            ShowJoinMessage(iClient);
     }
+}
+
+public client_putinserver_delayed(iUserId)
+{
+    new iClient = find_player_ex(FindPlayer_MatchUserId, iUserId);
+    if(iClient)
+        ShowJoinMessage(iClient);
+}
+
+ShowJoinMessage(iClient)
+{
+    if(is_user_bot(iClient) && g_bOutgoingIgnoreBots)
+        return;
+
+    if(is_user_hltv(iClient) && g_bOutgoingIgnoreHLTV)
+        return;
+
+    new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
+
+    if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
+        get_colorless_name(iClient, szUserName, charsmax(szUserName));
+    else
+        get_user_name(iClient, szUserName, charsmax(szUserName));
+
+    replace_all(szUserName, charsmax(szUserName), "^"", "");
+
+    if(g_bOutgoingJoinQuitPlayerCount)
+        formatex(szMessage, charsmax(szMessage), "%L [%d/%d]", LANG_SERVER, "MATTERAMXX_MESSAGE_JOINED", szUserName, get_playersnum_ex(GetPlayers_ExcludeBots), get_maxplayers());
+    else
+        formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_JOINED", szUserName);
+    
+    g_bUserConnected[iClient] = true;
+    g_szLastMessages[iClient] = "";
+    
+    new EzJSON:hJson = ezjson_init_object();
+    ezjson_object_set_string(hJson, "text", szMessage);
+    ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
+    if(!empty(g_szSystemAvatarUrl))
+        ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
+    ezjson_object_set_string(hJson, "userid", SYSMES_ID);
+
+    send_message_rest(hJson, g_szGateway);
 }
 
 stock get_suitable_target()
