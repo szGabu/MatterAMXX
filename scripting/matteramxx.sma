@@ -238,11 +238,11 @@ public plugin_init()
     g_cvarOutgoing_Chat_ZeroifyAtSign = create_cvar(        "amx_matter_bridge_outgoing_chat_zwsp_at",              "1",                                                  FCVAR_NONE,       "For outgoing messages. This controls if the plugin should add a ZWSP character after the at symbol (@) to prevent unintentional or malicious pinging.");
     g_cvarOutgoing_Chat_RequirePrefix = create_cvar(        "amx_matter_bridge_outgoing_chat_require_prefix",       "",                                                   FCVAR_NONE,       "For outgoing messages. Messages need this prefix to be able to be sent. Regex compatible.");
     g_cvarOutgoing_Chat_MuteServer = create_cvar(           "amx_matter_bridge_outgoing_chat_mute_server",          "0",                                                  FCVAR_NONE,       "For outgoing messages. When an user talks (and the message goes through the bridge) it will not be sent to other players. Works better with 'amx_matter_bridge_outgoing_chat_require_prefix' enabled.");
-    g_cvarOutgoing_Chat_IgnoreBots = create_cvar(           "amx_matter_bridge_outgoing_ignore_bots",               "0",                                                  FCVAR_NONE,       "For outgoing messages. For messages and events, anything coming from bots will be ignored. (Kills made by bots will be suppressed, but users killing bots will not).");
+    g_cvarOutgoing_Chat_IgnoreBots = create_cvar(           "amx_matter_bridge_outgoing_ignore_bots",               "1",                                                  FCVAR_NONE,       "For outgoing messages. For messages and events, anything coming from bots will be ignored. (Kills made by bots will be suppressed, but users killing bots will not).");
     g_cvarOutgoing_Chat_IgnoreHLTV = create_cvar(           "amx_matter_bridge_outgoing_ignore_hltv",               "1",                                                  FCVAR_NONE,       "For outgoing messages. For messages and events, anything coming from a HLTV proxy will be ignored.");
     g_cvarOutgoing_Kills = create_cvar(                     "amx_matter_bridge_outgoing_kills",                     "1",                                                  FCVAR_NONE,       "For outgoing messages. Transmit kill feed. It's recommended that you to turn it off on heavy activity servers (Like CSDM/Half-Life servers with tons of players).");
     g_cvarOutgoing_Join = create_cvar(                      "amx_matter_bridge_outgoing_join",                      "1",                                                  FCVAR_NONE,       "For outgoing messages. Transmit when people join the server.");
-    g_cvarOutgoing_Join_Wait = create_cvar(                 "amx_matter_bridge_outgoing_join_wait",                 "3.0",                                                  FCVAR_NONE,       "For outgoing messages. Amount of time to wait for every individual player before sending their join message. Useful if you have a plugin blocking improper names and you want to show the message when their name is validated.");
+    g_cvarOutgoing_Join_Wait = create_cvar(                 "amx_matter_bridge_outgoing_join_wait",                 "3.0",                                                FCVAR_NONE,       "For outgoing messages. Amount of time to wait for every individual player before sending their join message. Useful if you have a plugin blocking improper names and you want to show the message when their name is validated.");
     g_cvarOutgoing_Join_Delay = create_cvar(                "amx_matter_bridge_outgoing_join_delay",                "15",                                                 FCVAR_NONE,       "For outgoing messages. Specify how many seconds the server has to wait before sending Join messages.");
     g_cvarOutgoing_Quit = create_cvar(                      "amx_matter_bridge_outgoing_quit",                      "1",                                                  FCVAR_NONE,       "For outgoing messages. Transmit when people leave the server.");
     g_cvarOutgoing_Quit_IgnoreIntermission = create_cvar(   "amx_matter_bridge_outgoing_quit_ignore_intermission",  "0",                                                  FCVAR_NONE,       "For outgoing messages. Specify if the server shouldn't send quit messages if the server reached the intermission state (End of the Map).");
@@ -392,7 +392,7 @@ public plugin_end()
 public Task_JoinDelayDone()
 {
     g_bJoinDelayDone = true;
-    if(g_bOutgoingDisplayMap && get_playersnum_ex(GetPlayers_IncludeConnecting) > 0)
+    if(g_bOutgoingDisplayMap && get_playersnum_ex(GetPlayers_IncludeConnecting | (g_bOutgoingIgnoreBots ? GetPlayers_ExcludeBots : GetPlayers_None) | (g_bOutgoingIgnoreHLTV ? GetPlayers_ExcludeHLTV : GetPlayers_None)) > 0)
     {
         new sMapName[32], szMessage[MESSAGE_LENGTH];
         get_mapname(sMapName, charsmax(sMapName));
@@ -1003,7 +1003,7 @@ HandleDisconnectEvent(iClient)
         replace_all(szUserName, charsmax(szUserName), "^"", "");
 
         if(g_bOutgoingJoinQuitPlayerCount)
-            formatex(szMessage, charsmax(szMessage), "%L [%d/%d]", LANG_SERVER, "MATTERAMXX_MESSAGE_LEFT", szUserName, get_playersnum_ex(GetPlayers_ExcludeBots)-1, get_maxplayers());
+            formatex(szMessage, charsmax(szMessage), "%L [%d/%d]", LANG_SERVER, "MATTERAMXX_MESSAGE_LEFT", szUserName, get_playersnum_ex((g_bOutgoingIgnoreBots ? GetPlayers_ExcludeBots : GetPlayers_None) | (g_bOutgoingIgnoreHLTV ? GetPlayers_ExcludeHLTV : GetPlayers_None))-1, get_maxplayers());
         else
             formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_LEFT", szUserName);
         g_bUserConnected[iClient] = false;
@@ -1055,7 +1055,7 @@ ShowJoinMessage(iClient)
     replace_all(szUserName, charsmax(szUserName), "^"", "");
 
     if(g_bOutgoingJoinQuitPlayerCount)
-        formatex(szMessage, charsmax(szMessage), "%L [%d/%d]", LANG_SERVER, "MATTERAMXX_MESSAGE_JOINED", szUserName, get_playersnum_ex(GetPlayers_ExcludeBots), get_maxplayers());
+        formatex(szMessage, charsmax(szMessage), "%L [%d/%d]", LANG_SERVER, "MATTERAMXX_MESSAGE_JOINED", szUserName, get_playersnum_ex((g_bOutgoingIgnoreBots ? GetPlayers_ExcludeBots : GetPlayers_None) | (g_bOutgoingIgnoreHLTV ? GetPlayers_ExcludeHLTV : GetPlayers_None)), get_maxplayers());
     else
         formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_JOINED", szUserName);
     
