@@ -16,7 +16,7 @@
 // Useful in engines where there are no signature for the newer forward yet
 // This WILL cause a warning on compilation, but can be safely ignored
 // Useful in: Bleeding edge versions of Svengine
-#define USE_DEPRECATED_DISCONNECT_FORWARD 1
+#define USE_DEPRECATED_DISCONNECT_FORWARD 0
 // Did you know pawn supports a warning disable pragma but it was removed from AMX?
 // Yet they use the warning disable pragma in C when they compile AMXX bins?
 // Crazy right?
@@ -218,8 +218,8 @@ public plugin_init()
 
     g_cvarEnabled = create_cvar(                            "amx_matter_enable",                                    "1",                                                  FCVAR_NONE,       "Determines if MatterAMXX should be enabled.");
     g_cvarSystemAvatarUrl = create_cvar(                    "amx_matter_system_avatar",                             "",                                                   FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in system messages (In protocols that support it).");
-    g_cvarAutogenAvatarUrl = create_cvar(                   "amx_matter_autogenerate_avatar",                       "https://robohash.org/%s.png?set=set4",               FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in unauthenticated player messages (In protocols that support it). Use %s to pass the name as a parameter.");
-    g_cvarAvatarUrl = create_cvar(                          "amx_matter_player_avatar",                             "http://yourhost/avatars/get_avatar.php?steamid=%s",  FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in player messages (In protocols that support it), note that this is dynamic based on the user's Steam ID64, if it can't be retrieved the message will use unauthenticated avatars. Use %s to pass the SID64 as a parameter.");
+    g_cvarAutogenAvatarUrl = create_cvar(                   "amx_matter_autogenerate_avatar",                       "",                                                   FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in unauthenticated player messages (In protocols that support it). Use %s to pass the name as a parameter.");
+    g_cvarAvatarUrl = create_cvar(                          "amx_matter_player_avatar",                             "",                                                   FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in player messages (In protocols that support it), note that this is dynamic based on the user's Steam ID64, if it can't be retrieved the message will use unauthenticated avatars. Use %s to pass the SID64 as a parameter.");
     g_cvarBridgeProtocol = create_cvar(                     "amx_matter_bridge_protocol",                           "http",                                               FCVAR_PROTECTED,  "Protocol of where the bridge is located.");
     g_cvarBridgeHost = create_cvar(                         "amx_matter_bridge_host",                               "localhost",                                          FCVAR_PROTECTED,  "Host of where the bridge is located.");
     g_cvarBridgePort = create_cvar(                         "amx_matter_bridge_port",                               "1337",                                               FCVAR_PROTECTED,  "Port of where the bridge is located.");
