@@ -81,8 +81,6 @@ new g_cvarOutgoing_StripColors;
 new g_cvarOutgoing_DisplayMap;
 new g_cvarRetry_Delay;
 
-new g_cvarDeprecatedBridgeUrl; //deprecated
-
 new bool:g_bEnabled;
 
 new g_szAvatarUrl[BASE_URL_LENGTH];
@@ -92,7 +90,6 @@ new g_szSystemAvatarUrl[BASE_URL_LENGTH];
 new g_szBridgeProtocol[SHORT_LENGTH];
 new g_szBridgeHost[MAX_NAME_LENGTH];
 new g_szBridgePort[SHORT_LENGTH];
-new g_szBridgeDeprecatedBridgeUrl[BASE_URL_LENGTH];
 new g_szBridgeToken[BASE_URL_LENGTH];
 
 new bool:g_bIncomingMessages = false;
@@ -266,7 +263,6 @@ public plugin_init()
 public OnConfigsExecuted()
 {
     create_cvar("amx_matter_bridge_version", MATTERAMXX_PLUGIN_VERSION, FCVAR_SERVER);
-    g_cvarDeprecatedBridgeUrl = create_cvar("amx_matter_bridge_url", "", FCVAR_PROTECTED | FCVAR_SERVER | FCVAR_UNLOGGED);
 
     bind_pcvar_num(g_cvarEnabled, g_bEnabled);
     bind_pcvar_string(g_cvarSystemAvatarUrl, g_szSystemAvatarUrl, charsmax(g_szSystemAvatarUrl));
@@ -275,7 +271,6 @@ public OnConfigsExecuted()
     bind_pcvar_string(g_cvarBridgeProtocol, g_szBridgeProtocol, charsmax(g_szBridgeProtocol));
     bind_pcvar_string(g_cvarBridgeHost, g_szBridgeHost, charsmax(g_szBridgeHost));
     bind_pcvar_string(g_cvarBridgePort, g_szBridgePort, charsmax(g_szBridgePort));
-    bind_pcvar_string(g_cvarDeprecatedBridgeUrl, g_szBridgeDeprecatedBridgeUrl, charsmax(g_szBridgeDeprecatedBridgeUrl));
     bind_pcvar_string(g_cvarBridgeGateway, g_szGateway, charsmax(g_szGateway));
     bind_pcvar_string(g_cvarToken, g_szBridgeToken, charsmax(g_szBridgeToken));
     bind_pcvar_num(g_cvarIncoming, g_bIncomingMessages);
@@ -368,19 +363,11 @@ public OnConfigsExecuted()
 
 public PrepareBridgeUrl()
 {
-    if(!empty(g_szBridgeDeprecatedBridgeUrl))
+    formatex(g_szBridgeUrl, charsmax(g_szBridgeUrl), "%s://%s", g_szBridgeProtocol, g_szBridgeHost);
+    if(!empty(g_szBridgePort))
     {
-        server_print("[MatterAMXX Warning] amx_matter_bridge_url is deprecated. This will throw an error in future MatterBridge versions, please update your cvars.");
-        copy(g_szBridgeUrl, charsmax(g_szBridgeUrl), g_szBridgeDeprecatedBridgeUrl);
-    }
-    else
-    {
-        formatex(g_szBridgeUrl, charsmax(g_szBridgeUrl), "%s://%s", g_szBridgeProtocol, g_szBridgeHost);
-        if(!empty(g_szBridgePort))
-        {
-            add(g_szBridgeUrl, charsmax(g_szBridgeUrl), ":");
-            add(g_szBridgeUrl, charsmax(g_szBridgeUrl), g_szBridgePort);
-        }
+        add(g_szBridgeUrl, charsmax(g_szBridgeUrl), ":");
+        add(g_szBridgeUrl, charsmax(g_szBridgeUrl), g_szBridgePort);
     }
 }
 
