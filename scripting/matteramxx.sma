@@ -534,15 +534,9 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
             if(empty(szProtocol))
                 copy(szProtocol, charsmax(szProtocol), g_szGamename);
 
-            // apparently the super compact code didn't work on CS
-            // let's try it again
-
-            if(cstrike_running()) 
+            if(g_hCurrentGame == GAME_CSTRIKE || g_hCurrentGame == GAME_CZERO || g_hCurrentGame == GAME_DOD) 
             {
-                // counter strike is running
-                // todo: does DOD support color chat?
-
-                new bool:is_red = containi(szUserName, "!b") ? false : true;
+                new bool:bIsRed = containi(szUserName, "!b") ? false : true;
 
                 replace_all(szUserName, charsmax(szUserName), "!n", "^1");
                 replace_all(szUserName, charsmax(szUserName), "!r", "^3");
@@ -553,26 +547,23 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
                 if(strlen(g_szForcePrefix) > 0)
                     formatex(szMessageNew, charsmax(szMessageNew), g_bIncomingDontColorize ? "%s %s^1: %s" : "^4%s %s^1: %s", g_szForcePrefix, szUserName, szMessage);
                 else
-                    formatex(szMessageNew, charsmax(szMessageNew), "%s^1: %s", szUserName, szMessage);
+                    formatex(szMessageNew, charsmax(szMessageNew), g_bIncomingDontColorize ? "%s^1: %s" : "^4%s^1: %s", szUserName, szMessage);
 
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
                     server_print("[DEBUG] %s::MatterPrintMessage() - szMessageNew %s", __BINARY__, szMessageNew);
 
-                client_print_color(0, is_red ? print_team_red : print_team_blue, szMessageNew); 
+                client_print_color(0, bIsRed ? print_team_red : print_team_blue, szMessageNew); 
             }
             else  
             {
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
                     server_print("[DEBUG] %s::MatterPrintMessage() - Not Counter-Strike", __BINARY__);
 
-                // counter strike is not running, so we wouldn't have colors even if we wanted them
-                // 2022 Update: it's possible to get colors in games that are not CS or DOD
-                // we just need an overly complicated hack
                 if(g_bIncomingRelayMessagesOnUser)
                 {
                     if(g_iPluginFlags & AMX_FLAG_DEBUG)
                         server_print("[DEBUG] %s::MatterPrintMessage() - g_bIncomingRelayMessagesOnUser", __BINARY__);
-                    //we need to create a message queue, otherwise race conditions might occur
+
                     PrintRelayUser(szMessage, szUserName);
                 }
                 else
