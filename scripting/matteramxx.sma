@@ -163,7 +163,8 @@ enum aCurrentGame
     GAME_RICOCHET,
     GAME_SPECIALISTS,
     GAME_TEAMFORTRESS,
-    GAME_SVENCOOP
+    GAME_SVENCOOP,
+    GAME_ADRENALINE_GAMER
 }
 
 enum _: aMessageQueueStruct
@@ -210,6 +211,8 @@ public plugin_init()
         g_hCurrentGame = GAME_TEAMFORTRESS;
     else if(equali(g_szGamename, "svencoop"))
         g_hCurrentGame = GAME_SVENCOOP;
+    else if(equali(g_szGamename, "ag"))
+        g_hCurrentGame = GAME_ADRENALINE_GAMER;
 
     get_cvar_string("hostname", szServerName, charsmax(szServerName));
 
@@ -682,6 +685,9 @@ public Event_SayMessage(iClient)
     remove_quotes(szMessage);
     replace_all(szMessage, charsmax(szMessage), "^"", "\^"");
 
+    if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
+        strip_colors_from_string(szMessage);
+
     trim(szMessage);
 
     if(!empty(g_szOutgoingRequirePrefix) && szMessage[0] != g_szOutgoingRequirePrefix[0])
@@ -717,7 +723,7 @@ public Event_SayMessage(iClient)
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
             server_print("[DEBUG] %s::Event_SayMessage() - iClient is %i.", __BINARY__, iClient);
-        if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
+        if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
             get_colorless_name(iClient, szUserName, charsmax(szUserName));
         else
             get_user_name(iClient, szUserName, charsmax(szUserName));
@@ -842,7 +848,7 @@ public Event_PlayerKilled(iClient, iAttacker)
 {
     new szUserName[MAX_NAME_LENGTH], szAttackerName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
     
-    if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
+    if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
         get_colorless_name(iClient, szUserName, charsmax(szUserName));
     else
         get_user_name(iClient, szUserName, charsmax(szUserName));
@@ -855,7 +861,7 @@ public Event_PlayerKilled(iClient, iAttacker)
         if(is_user_hltv(iAttacker) && g_bOutgoingIgnoreHLTV)
             return;
             
-        if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
+        if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
             get_colorless_name(iAttacker, szAttackerName, charsmax(szAttackerName));
         else
             get_user_name(iAttacker, szAttackerName, charsmax(szAttackerName));
@@ -974,7 +980,7 @@ HandleDisconnectEvent(iClient)
             return;
             
         new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
-        if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
+        if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
             get_colorless_name(iClient, szUserName, charsmax(szUserName));
         else
             get_user_name(iClient, szUserName, charsmax(szUserName));
@@ -1025,7 +1031,7 @@ ShowJoinMessage(iClient)
 
     new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
 
-    if((equali(g_szGamename, "valve") || equali(g_szGamename, "ag")) && g_bOutgoingStripColors)
+    if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
         get_colorless_name(iClient, szUserName, charsmax(szUserName));
     else
         get_user_name(iClient, szUserName, charsmax(szUserName));
@@ -1085,26 +1091,30 @@ stock empty(const szString[])
 //thanks to YaLTeR
 stock get_colorless_name(iClient, szName[], iLen)
 {
-	get_user_name(iClient, szName, iLen);
+    get_user_name(iClient, szName, iLen);
+    strip_colors_from_string(szName);
+}
 
+stock strip_colors_from_string(szMessage[])
+{
 	// Clear out color codes
 	new i, j;
 	new const hat[3] = "^^";
-	while(szName[i])
+	while(szMessage[i])
 	{
-		if(szName[i] == hat[0] && szName[i + 1] >= '0' && szName[i + 1] <= '9')
+		if(szMessage[i] == hat[0] && szMessage[i + 1] >= '0' && szMessage[i + 1] <= '9')
 		{
 			i++;
 		}
 		else
 		{
 			if(j != i)
-				szName[j] = szName[i];
+				szMessage[j] = szMessage[i];
 			j++;
 		}
 		i++;
 	}
-	szName[j] = 0;
+	szMessage[j] = 0;
 }
 
 //thanks to Th3-822
