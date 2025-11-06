@@ -733,7 +733,10 @@ SayMessage_Process(iClient, iMessageSource)
         strip_colors_from_string(szMessage);
 
     trim(szMessage);
-    
+
+    if(strlen(szMessage) == 0)
+        return PLUGIN_CONTINUE;
+
     new bIsSpectator = false;
 
     if(g_iOutgoingPrefixTeam & iMessageSource)
