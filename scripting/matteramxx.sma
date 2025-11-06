@@ -23,10 +23,20 @@
 
 // ** COMPILER OPTIONS END HERE **
 
+#define TEAM_0_SYMBOL       "🟧" // Invalid or not Teamplay
+#define TEAM_1_SYMBOL       "🟦" // Team 1 in Half-Life, CTs in Counter-Strike, BLUE in Team Fortress
+#define TEAM_2_SYMBOL       "🟥" // Team 2 in Half-Life, Terrorists in Counter-Strike, RED in Team Fortress
+#define TEAM_3_SYMBOL       "🟨" // Team 3 in Half-Life, YELLOW in Team Fortress
+#define TEAM_4_SYMBOL       "🟩" // Team 4 in Half-Life, GREEN in Team Fortress
+#define TEAM_5_SYMBOL       "⬛️" // Team 5 in Half-Life, then he loops back to 1 to repeat the colors
+#define SPECTATOR_SYMBOL    "⬜️" // Spectator team
+#define DEAD_SYMBOL         "☠️" // Dead (Ghost), spectating but currently on a team
+
 #include <amxmisc>
 #include <fakemeta>
 #include <regex>
 #include <fun>
+#tryinclude <hlstocks>
 
 #if USE_HAMSANDWICH > 0
     #include <hamsandwich>
@@ -67,6 +77,8 @@ new g_cvarOutgoing_Chat_SpamFil;
 new g_cvarOutgoing_Chat_ZeroifyAtSign;
 new g_cvarOutgoing_Chat_RequirePrefix;
 new g_cvarOutgoing_Chat_MuteServer;
+new g_cvarOutgoing_Chat_PrefixTeam;
+new g_cvarOutgoing_Chat_PrefixDeadStatus;
 new g_cvarOutgoing_Chat_IgnoreBots;
 new g_cvarOutgoing_Chat_IgnoreHLTV;
 new g_cvarForcePrefix;
@@ -106,6 +118,8 @@ new bool:g_bOutgoingNoRepeat = false;
 new bool:g_bOutgoingZwspAt = false;
 new g_szOutgoingRequirePrefix[SHORT_LENGTH];
 new bool:g_bOutgoingMuteServer = false;
+new g_iOutgoingPrefixTeam = 0;
+new g_iOutgoingPrefixDeadStatus = 0;
 new bool:g_bOutgoingIgnoreBots = false;
 new bool:g_bOutgoingIgnoreHLTV = false;
 new g_szForcePrefix[MAX_NAME_LENGTH];
@@ -118,7 +132,6 @@ new bool:g_bOutgoingLeaveIgnoreIntermission = false;
 new bool:g_bOutgoingStripColors = false;
 new bool:g_bOutgoingDisplayMap = false;
 new bool:g_bOutgoingJoinQuitPlayerCount = false;
-
 new Float:g_fRetryDelay = 0.0;
 
 new g_szIncomingUri[BASE_URL_LENGTH];
@@ -129,6 +142,8 @@ new g_szGamename[MAX_NAME_LENGTH];
 
 new g_szLastMessages[MAX_PLAYERS+1][MESSAGE_LENGTH];
 new g_bUserConnected[MAX_PLAYERS+1];
+
+new bool:g_bTeamPlay = false;
 
 new g_bUserAuthenticated[MAX_PLAYERS+1];
 
@@ -149,8 +164,6 @@ enum (*= 2)
 {
     CHAT_TYPE_ALL = 1,
     CHAT_TYPE_TEAM,
-//    CHAT_TYPE_ALL_SYSMSG,
-//    CHAT_TYPE_TEAM_SYSMSG
 }
 
 enum aCurrentGame
@@ -164,7 +177,9 @@ enum aCurrentGame
     GAME_SPECIALISTS,
     GAME_TEAMFORTRESS,
     GAME_SVENCOOP,
-    GAME_ADRENALINE_GAMER
+    GAME_ADRENALINE_GAMER,
+    GAME_OPFOR,
+    GAME_DMC,
 }
 
 enum _: aMessageQueueStruct
@@ -213,6 +228,10 @@ public plugin_init()
         g_hCurrentGame = GAME_SVENCOOP;
     else if(equali(g_szGamename, "ag"))
         g_hCurrentGame = GAME_ADRENALINE_GAMER;
+    else if(equali(g_szGamename, "gearbox"))
+        g_hCurrentGame = GAME_OPFOR;
+    else if(equali(g_szGamename, "dmc"))
+        g_hCurrentGame = GAME_DMC;
 
     get_cvar_string("hostname", szServerName, charsmax(szServerName));
 
@@ -238,6 +257,8 @@ public plugin_init()
     g_cvarOutgoing_Chat_ZeroifyAtSign = create_cvar(        "amx_matter_bridge_outgoing_chat_zwsp_at",              "1",                                                  FCVAR_NONE,       "For outgoing messages. This controls if the plugin should add a ZWSP character after the at symbol (@) to prevent unintentional or malicious pinging.");
     g_cvarOutgoing_Chat_RequirePrefix = create_cvar(        "amx_matter_bridge_outgoing_chat_require_prefix",       "",                                                   FCVAR_NONE,       "For outgoing messages. Messages need this prefix to be able to be sent. Regex compatible.");
     g_cvarOutgoing_Chat_MuteServer = create_cvar(           "amx_matter_bridge_outgoing_chat_mute_server",          "0",                                                  FCVAR_NONE,       "For outgoing messages. When an user talks (and the message goes through the bridge) it will not be sent to other players. Works better with 'amx_matter_bridge_outgoing_chat_require_prefix' enabled.");
+    g_cvarOutgoing_Chat_PrefixTeam = create_cvar(           "amx_matter_bridge_outgoing_chat_prefix_team",          "2",                                                  FCVAR_NONE,       "For outgoing messages. When an user talks (and the message goes through the bridge) the message will contain a prefix representing their team if they speak though a respective channel. (1=All chat 2=Team chat) You must sum the values you want to send. 0 to disable.");
+    g_cvarOutgoing_Chat_PrefixDeadStatus = create_cvar(     "amx_matter_bridge_outgoing_chat_prefix_dead_status",   "2",                                                  FCVAR_NONE,       "For outgoing messages. When an user talks (and the message goes through the bridge) the message will contain a prefix representing if they're dead if they speak though a respective channel. (1=All chat 2=Team chat) You must sum the values you want to send. 0 to disable.");
     g_cvarOutgoing_Chat_IgnoreBots = create_cvar(           "amx_matter_bridge_outgoing_ignore_bots",               "1",                                                  FCVAR_NONE,       "For outgoing messages. For messages and events, anything coming from bots will be ignored. (Kills made by bots will be suppressed, but users killing bots will not).");
     g_cvarOutgoing_Chat_IgnoreHLTV = create_cvar(           "amx_matter_bridge_outgoing_ignore_hltv",               "1",                                                  FCVAR_NONE,       "For outgoing messages. For messages and events, anything coming from a HLTV proxy will be ignored.");
     g_cvarOutgoing_Kills = create_cvar(                     "amx_matter_bridge_outgoing_kills",                     "1",                                                  FCVAR_NONE,       "For outgoing messages. Transmit kill feed. It's recommended that you to turn it off on heavy activity servers (Like CSDM/Half-Life servers with tons of players).");
@@ -289,6 +310,8 @@ public OnConfigsExecuted()
     bind_pcvar_num(g_cvarOutgoing_Chat_ZeroifyAtSign, g_bOutgoingZwspAt);
     bind_pcvar_string(g_cvarOutgoing_Chat_RequirePrefix, g_szOutgoingRequirePrefix, charsmax(g_szOutgoingRequirePrefix));
     bind_pcvar_num(g_cvarOutgoing_Chat_MuteServer, g_bOutgoingMuteServer);
+    bind_pcvar_num(g_cvarOutgoing_Chat_PrefixTeam, g_iOutgoingPrefixTeam);
+    bind_pcvar_num(g_cvarOutgoing_Chat_PrefixDeadStatus, g_iOutgoingPrefixDeadStatus);
     bind_pcvar_num(g_cvarOutgoing_Chat_IgnoreBots, g_bOutgoingIgnoreBots);
     bind_pcvar_num(g_cvarOutgoing_Chat_IgnoreHLTV, g_bOutgoingIgnoreHLTV);
     bind_pcvar_num(g_cvarOutgoing_Kills, g_bOutgoingKills);
@@ -302,6 +325,11 @@ public OnConfigsExecuted()
     bind_pcvar_num(g_cvarOutgoing_JoinQuit_ShowCount, g_bOutgoingJoinQuitPlayerCount);
     bind_pcvar_string(g_cvarForcePrefix, g_szForcePrefix, charsmax(g_szForcePrefix));
     bind_pcvar_float(g_cvarRetry_Delay, g_fRetryDelay);
+    
+    new hCvarTeamPlay = get_cvar_pointer("mp_teamplay");
+
+    if(hCvarTeamPlay)
+        bind_pcvar_num(hCvarTeamPlay, g_bTeamPlay);
 
     if(g_bEnabled)
     {
@@ -313,10 +341,8 @@ public OnConfigsExecuted()
             
             if(g_iOutgoingChatMode > 0)
             {
-                if(g_iOutgoingChatMode & CHAT_TYPE_ALL)
-                    register_clcmd("say", "Event_SayMessage");
-                if(g_iOutgoingChatMode & CHAT_TYPE_TEAM)
-                    register_clcmd("say_team", "Event_SayMessage");
+                register_clcmd("say", "Event_SayMessage_All");
+                register_clcmd("say_team", "Event_SayMessage_Team");
             }
 
             if(g_bOutgoingKills)
@@ -671,7 +697,25 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
     }
 }
 
-public Event_SayMessage(iClient)
+
+public Event_SayMessage_All(iClient)
+{
+    if(g_iOutgoingChatMode & CHAT_TYPE_ALL)
+        return SayMessage_Process(iClient, CHAT_TYPE_ALL);
+
+    return PLUGIN_CONTINUE;
+}
+
+public Event_SayMessage_Team(iClient)
+{
+    
+    if(g_iOutgoingChatMode & CHAT_TYPE_TEAM)
+        return SayMessage_Process(iClient, CHAT_TYPE_TEAM);
+
+    return PLUGIN_CONTINUE;
+}
+
+SayMessage_Process(iClient, iMessageSource)
 {
     if(is_user_bot(iClient) && g_bOutgoingIgnoreBots)
         return PLUGIN_CONTINUE;
@@ -689,6 +733,67 @@ public Event_SayMessage(iClient)
         strip_colors_from_string(szMessage);
 
     trim(szMessage);
+    
+    new bIsSpectator = false;
+
+    if(g_iOutgoingPrefixTeam & iMessageSource)
+    {
+        if(g_hCurrentGame == GAME_SVENCOOP || g_hCurrentGame == GAME_RICOCHET || ((g_hCurrentGame == GAME_SPECIALISTS || g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER || g_hCurrentGame == GAME_OPFOR || g_hCurrentGame == GAME_DMC) && !g_bTeamPlay))
+            format(szMessage, charsmax(szMessage), "%s %s", TEAM_0_SYMBOL, szMessage);
+        else
+        {
+            new iTeam = get_user_team(iClient);
+            new szTeamSymbol[8];
+
+            if(g_hCurrentGame == GAME_CSTRIKE || g_hCurrentGame == GAME_CZERO)
+            {
+                switch (iTeam)
+                {
+                    case 1: 
+                        copy(szTeamSymbol, charsmax(szTeamSymbol), TEAM_2_SYMBOL); //terrorists
+                    case 2: 
+                        copy(szTeamSymbol, charsmax(szTeamSymbol), TEAM_1_SYMBOL); //counter-terrorists
+                    default: 
+                    {
+                        bIsSpectator = true;
+                        copy(szTeamSymbol, charsmax(szTeamSymbol), SPECTATOR_SYMBOL); 
+                    }
+                }
+            }
+            else
+            {
+                if(pev(iClient, pev_iuser1) != 0)
+                {
+                    bIsSpectator = true;
+                    copy(szTeamSymbol, charsmax(szTeamSymbol), SPECTATOR_SYMBOL); 
+                }
+                else
+                {
+                    #if defined _hlstocks_included
+                    if(g_hCurrentGame == GAME_SPECIALISTS || g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER || g_hCurrentGame == GAME_OPFOR || g_hCurrentGame == GAME_DMC)
+                        iTeam = __get_user_team(iClient);
+                    #endif
+
+                    new iLoopedTeam = ((iTeam - 1) % 5) + 1;
+
+                    switch (iLoopedTeam)
+                    {
+                        case 1: copy(szTeamSymbol, charsmax(szTeamSymbol), TEAM_1_SYMBOL);
+                        case 2: copy(szTeamSymbol, charsmax(szTeamSymbol), TEAM_2_SYMBOL);
+                        case 3: copy(szTeamSymbol, charsmax(szTeamSymbol), TEAM_3_SYMBOL);
+                        case 4: copy(szTeamSymbol, charsmax(szTeamSymbol), TEAM_4_SYMBOL);
+                        case 5: copy(szTeamSymbol, charsmax(szTeamSymbol), TEAM_5_SYMBOL);
+                        default: copy(szTeamSymbol, charsmax(szTeamSymbol), TEAM_0_SYMBOL);
+                    }
+                }
+            }
+
+            format(szMessage, charsmax(szMessage), "%s %s", szTeamSymbol, szMessage);
+        }
+    }
+
+    if(g_iOutgoingPrefixDeadStatus & iMessageSource && !is_user_alive(iClient) && !bIsSpectator)
+        format(szMessage, charsmax(szMessage), "%s %s", DEAD_SYMBOL, szMessage);
 
     if(!empty(g_szOutgoingRequirePrefix) && szMessage[0] != g_szOutgoingRequirePrefix[0])
         return PLUGIN_CONTINUE;
