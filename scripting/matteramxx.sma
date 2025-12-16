@@ -23,15 +23,6 @@
 
 // ** COMPILER OPTIONS END HERE **
 
-#define TEAM_0_SYMBOL       "🟧" // Invalid or not Teamplay
-#define TEAM_1_SYMBOL       "🟦" // Team 1 in Half-Life, CTs in Counter-Strike, BLUE in Team Fortress
-#define TEAM_2_SYMBOL       "🟥" // Team 2 in Half-Life, Terrorists in Counter-Strike, RED in Team Fortress
-#define TEAM_3_SYMBOL       "🟨" // Team 3 in Half-Life, YELLOW in Team Fortress
-#define TEAM_4_SYMBOL       "🟩" // Team 4 in Half-Life, GREEN in Team Fortress
-#define TEAM_5_SYMBOL       "⬛️" // Team 5 in Half-Life, then he loops back to 1 to repeat the colors
-#define SPECTATOR_SYMBOL    "⬜️" // Spectator team
-#define DEAD_SYMBOL         "☠️" // Dead (Ghost), spectating but currently on a team
-
 #include <amxmisc>
 #include <fakemeta>
 #include <regex>
