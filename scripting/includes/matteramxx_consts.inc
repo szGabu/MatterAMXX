@@ -6,8 +6,8 @@
 #define INCOMING_BUFFER_LENGTH      10240
 #define SERVER_RESPONSE_LENGTH      5120
 #define TARGET_URL_LENGTH           2048
+#define BASE_URL_LENGTH             2048
 #define MESSAGE_LENGTH              1024
-#define BASE_URL_LENGTH             512
 #define JSON_PARAMETER_LENGTH       512
 #define TOKEN_LENGTH                128
 #define SHORT_LENGTH                16
