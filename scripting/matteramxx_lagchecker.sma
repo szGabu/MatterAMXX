@@ -31,7 +31,7 @@ static g_iPluginFlags;
 
 new g_bRestartScheduled = false;
 
-new Regex:g_rPattern;
+new Regex:g_hStatusPattern;
 
 public plugin_init()
 {
@@ -48,6 +48,12 @@ public plugin_init()
     AutoExecConfig();
 
     register_dictionary("matteramxx.txt");
+}
+
+public plugin_end()
+{
+    if(g_hStatusPattern)
+        regex_free(g_hStatusPattern);
 }
 
 public OnConfigsExecuted()
@@ -73,7 +79,7 @@ public OnConfigsExecuted()
                 server_print("[DEBUG] %s::plugin_cfg() - Finished plugin_cfg()", __BINARY__);
             }
 
-            g_rPattern = regex_compile_ex(REGEX_STATUS);
+            g_hStatusPattern = regex_compile_ex(REGEX_STATUS);
         }
         else
             set_fail_state("This plugin requires MatterAMXX to be loaded.");
@@ -116,10 +122,11 @@ public Task_ExecuteLagCheck()
     replace_all(szStats, charsmax(szStats), "^n", "LB");
 
     new szComputeField[16], szFramesField[16];
-    if(regex_match_c(szStats, g_rPattern))
+    new Regex:hHandle = Regex:regex_match_c(szStats, g_hStatusPattern);
+    if(hHandle > REGEX_NO_MATCH)
     {
-        regex_substr(g_rPattern, 1, szComputeField, charsmax(szComputeField));
-        regex_substr(g_rPattern, 2, szFramesField, charsmax(szFramesField));
+        regex_substr(g_hStatusPattern, 1, szComputeField, charsmax(szComputeField));
+        regex_substr(g_hStatusPattern, 2, szFramesField, charsmax(szFramesField));
 
         new Float:fCpuPercent = str_to_float(szComputeField);
         new Float:iFpsValue = str_to_float(szFramesField);

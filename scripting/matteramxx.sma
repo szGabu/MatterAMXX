@@ -150,13 +150,13 @@ new g_bUserAuthenticated[MAX_PLAYERS+1];
 new bool:g_bJoinDelayDone = false;
 new bool:g_bIsIntermission = false;
 
+new Regex:g_hIncomingPattern;
+new Regex:g_hSteamPattern;
+
 new g_hPrintMessageForward; 
 new g_iPluginFlags;
 
 new g_hSayTextUserMessage;
-
-new Regex:g_hAuthId_Pattern;
-new Regex:g_hPrefix_Pattern;
 
 new const sHexTable[] = "0123456789ABCDEF";
 
@@ -202,9 +202,6 @@ public plugin_natives()
 
 public plugin_init()
 {
-    //always compile regex on map init to avoid errors
-    g_hAuthId_Pattern = regex_compile(REGEX_STEAMID_PATTERN);
-    
     register_plugin(MATTERAMXX_PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR);
 
     new szServerName[MAX_NAME_LENGTH];
@@ -359,7 +356,7 @@ public OnConfigsExecuted()
             else
                 Task_JoinDelayDone();
 
-            if(!g_bOutgoingLeaveIgnoreIntermission)
+            if(g_bOutgoingLeaveIgnoreIntermission)
                 register_message(SVC_INTERMISSION, "Event_Intermission");
 
             replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!n", "^1");
@@ -379,12 +376,11 @@ public OnConfigsExecuted()
                 server_print("[DEBUG] %s::plugin_cfg() - g_fIncomingUpdateTime is %f", __BINARY__, g_fIncomingUpdateTime);
 
             set_task(g_fIncomingUpdateTime, "MatterConnectAPI");
-
-            if(!empty(g_szIncomingIgnorePrefix))
-                g_hPrefix_Pattern = regex_compile(g_szIncomingIgnorePrefix);
         }
 
         g_iPluginFlags = plugin_flags();
+        g_hIncomingPattern = regex_compile_ex(g_szIncomingIgnorePrefix);
+        g_hSteamPattern = regex_compile_ex(REGEX_STEAMID_PATTERN);
     }
     else
         pause("ad");
@@ -402,6 +398,12 @@ public PrepareBridgeUrl()
 
 public plugin_end()
 {
+    if(g_hIncomingPattern)
+        regex_free(g_hIncomingPattern);
+
+    if(g_hSteamPattern)
+        regex_free(g_hSteamPattern);
+
     DestroyForward(g_hPrintMessageForward);
 }
 
@@ -413,6 +415,9 @@ public Task_JoinDelayDone()
         new sMapName[32], szMessage[MESSAGE_LENGTH];
         get_mapname(sMapName, charsmax(sMapName));
         formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_MAP_CHANGED", sMapName);
+
+        if(g_bOutgoingZwspAt)
+            replace_all(szMessage, charsmax(szMessage), "@", "@​");
 
         new EzJSON:hJson = ezjson_init_object();
         ezjson_object_set_string(hJson, "text", szMessage);
@@ -803,9 +808,6 @@ SayMessage_Process(iClient, iMessageSource)
     else if(!empty(g_szOutgoingRequirePrefix))
         format(szMessage, charsmax(szMessage), "%s" , szMessage[strlen(g_szOutgoingRequirePrefix)]); 
 
-    if(g_bOutgoingZwspAt)
-        replace_all(szMessage, charsmax(szMessage), "@", "@​");
-
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
         server_print("[DEBUG] %s::Event_SayMessage() - Message ^"%s^" was sent.", __BINARY__, szMessage);
 
@@ -848,13 +850,13 @@ SayMessage_Process(iClient, iMessageSource)
         {
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is from a player.", __BINARY__);
-            new sAvatarUrlFull[TARGET_URL_LENGTH];
+            new szAvatarUrlFull[TARGET_URL_LENGTH];
             if(g_bUserAuthenticated[iClient])
             {
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
                     server_print("[DEBUG] %s::Event_SayMessage() - User is authenticated.", __BINARY__);
                 if(!empty(g_szAvatarUrl))
-                    formatex(sAvatarUrlFull, charsmax(sAvatarUrlFull), g_szAvatarUrl, szSteamId);
+                    formatex(szAvatarUrlFull, charsmax(szAvatarUrlFull), g_szAvatarUrl, szSteamId);
             }
             else
             {
@@ -862,17 +864,17 @@ SayMessage_Process(iClient, iMessageSource)
                     server_print("[DEBUG] %s::Event_SayMessage() - User not is authenticated.", __BINARY__);
                 if(!empty(g_szAutogenAvatarUrl))
                 {
-                    new sEncodedName[MAX_NAME_LENGTH];
-                    url_encode(szUserName, sEncodedName, charsmax(sEncodedName));
-                    formatex(sAvatarUrlFull, charsmax(sAvatarUrlFull), g_szAutogenAvatarUrl, sEncodedName);
+                    new szEncodedName[MAX_NAME_LENGTH];
+                    url_encode(szUserName, szEncodedName, charsmax(szEncodedName));
+                    formatex(szAvatarUrlFull, charsmax(szAvatarUrlFull), g_szAutogenAvatarUrl, szEncodedName);
                 }
             }
 
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                server_print("[DEBUG] %s::Event_SayMessage() - Resulting avatar URL is %s.", __BINARY__, sAvatarUrlFull);
+                server_print("[DEBUG] %s::Event_SayMessage() - Resulting avatar URL is %s.", __BINARY__, szAvatarUrlFull);
 
-            if(!empty(sAvatarUrlFull))
-                ezjson_object_set_string(hJson, "avatar", sAvatarUrlFull);
+            if(!empty(szAvatarUrlFull))
+                ezjson_object_set_string(hJson, "avatar", szAvatarUrlFull);
         }
         else if(!empty(g_szSystemAvatarUrl))
         {
@@ -881,6 +883,9 @@ SayMessage_Process(iClient, iMessageSource)
             ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
         }
     } 
+
+    if(g_bOutgoingZwspAt)
+        replace_all(szMessage, charsmax(szMessage), "@", "@​");
 
     ezjson_object_set_string(hJson, "text", szMessage);
     ezjson_object_set_string(hJson, "username", (iClient) ? szUserName : g_szOutgoingSystemUsername);
@@ -984,6 +989,9 @@ public Event_PlayerKilled(iClient, iAttacker)
 
     new EzJSON:hJson = ezjson_init_object();
 
+    if(g_bOutgoingZwspAt)
+        replace_all(szMessage, charsmax(szMessage), "@", "@​");
+
     ezjson_object_set_string(hJson, "text", szMessage);
     ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
     if(!empty(g_szSystemAvatarUrl))
@@ -1005,6 +1013,9 @@ public send_message_custom(iPlugin, iParams)
     get_string(5, sGateway, charsmax(sGateway));
 
     new EzJSON:hJson = ezjson_init_object();
+
+    if(g_bOutgoingZwspAt)
+        replace_all(szMessage, charsmax(szMessage), "@", "@​");
 
     ezjson_object_set_string(hJson, "text", szMessage);
     ezjson_object_set_string(hJson, "username", empty(szUsername) ? g_szOutgoingSystemUsername : szUsername);
@@ -1099,6 +1110,9 @@ HandleDisconnectEvent(iClient)
         else
             formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_LEFT", szUserName);
         g_bUserConnected[iClient] = false;
+
+        if(g_bOutgoingZwspAt)
+            replace_all(szMessage, charsmax(szMessage), "@", "@​");
         
         new EzJSON:hJson = ezjson_init_object();
         ezjson_object_set_string(hJson, "text", szMessage);
@@ -1153,6 +1167,9 @@ ShowJoinMessage(iClient)
     
     g_bUserConnected[iClient] = true;
     g_szLastMessages[iClient] = "";
+
+    if(g_bOutgoingZwspAt)
+        replace_all(szMessage, charsmax(szMessage), "@", "@​");
     
     new EzJSON:hJson = ezjson_init_object();
     ezjson_object_set_string(hJson, "text", szMessage);
@@ -1296,10 +1313,16 @@ stock send_message_rest(EzJSON:hJson, const szGateway[])
 
 stock is_valid_authid(szAuthId[]) 
 {
-    return regex_match_c(szAuthId, g_hAuthId_Pattern) > 0;
+    new Regex:hHandle = Regex:regex_match_c(szAuthId, g_hSteamPattern);
+    new bool:bValid = hHandle > REGEX_NO_MATCH;
+    regex_free(hHandle);
+    return bValid;
 }
 
 stock prefix_matches(const szMessage[]) 
 {
-    return regex_match_c(szMessage, g_hPrefix_Pattern) > 0;
+    new Regex:hHandle = Regex:regex_match_c(szMessage, g_hIncomingPattern);
+    new bool:bMatches = hHandle > REGEX_NO_MATCH;
+    regex_free(hHandle);
+    return bMatches;
 }

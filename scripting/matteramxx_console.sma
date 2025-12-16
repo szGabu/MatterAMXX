@@ -40,7 +40,7 @@ new g_iProtectedArraySize = 0;
 new Trie:g_iTrieObeyTo;
 new Array:g_iProtectedCvars;
 
-new Regex:g_rPattern;
+new Regex:g_hIPPattern;
 
 new const g_sDangerousCommands[][] = { 
         "cmdlist",      //server crashes
@@ -120,7 +120,7 @@ public OnConfigsExecuted()
             ReadConVars(szFileName);
             unlink(szFileName);
 
-            g_rPattern = regex_compile_ex(IP_REGEX);
+            g_hIPPattern = regex_compile_ex(IP_REGEX);
 
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::OnConfigsExecuted() - Finished OnConfigsExecuted()", __BINARY__);
@@ -134,6 +134,8 @@ public OnConfigsExecuted()
 
 public plugin_end()
 {
+    if(g_hIPPattern)
+        regex_free(g_hIPPattern);
     TrieDestroy(g_iTrieObeyTo);
     ArrayDestroy(g_iProtectedCvars);
 }
@@ -255,7 +257,7 @@ public matteramxx_print_message(szMessage[MESSAGE_LENGTH], szUserName[MAX_NAME_L
                 HideProtectedCvars(g_szResponseMessage, charsmax(g_szResponseMessage));
 
             if(g_bHideIPs)
-                regex_replace(g_rPattern, g_szResponseMessage, charsmax(g_szResponseMessage), "$1XXX.XXX");
+                regex_replace(g_hIPPattern, g_szResponseMessage, charsmax(g_szResponseMessage), "$1XXX.XXX");
 
             if(g_bCodeBlock)
                 add(g_szResponseMessage, charsmax(g_szResponseMessage), "```");
