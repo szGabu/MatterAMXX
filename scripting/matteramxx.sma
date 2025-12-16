@@ -359,11 +359,11 @@ public OnConfigsExecuted()
             if(g_bOutgoingLeaveIgnoreIntermission)
                 register_message(SVC_INTERMISSION, "Event_Intermission");
 
-            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!n", "^1");
-            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!r", "^3");
-            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!b", "^3");
-            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!g", "^4");
-            replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!t", TEAM_COLOR_PLACEHOLDER);
+            replace_string(g_szForcePrefix, charsmax(g_szForcePrefix), "!n", "^1");
+            replace_string(g_szForcePrefix, charsmax(g_szForcePrefix), "!r", "^3");
+            replace_string(g_szForcePrefix, charsmax(g_szForcePrefix), "!b", "^3");
+            replace_string(g_szForcePrefix, charsmax(g_szForcePrefix), "!g", "^4");
+            replace_string(g_szForcePrefix, charsmax(g_szForcePrefix), "!t", TEAM_COLOR_PLACEHOLDER);
         }
         
         if(g_bIncomingMessages)
@@ -417,7 +417,7 @@ public Task_JoinDelayDone()
         formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_MAP_CHANGED", sMapName);
 
         if(g_bOutgoingZwspAt)
-            replace_all(szMessage, charsmax(szMessage), "@", "@​");
+            replace_string(szMessage, charsmax(szMessage), "@", "@​");
 
         new EzJSON:hJson = ezjson_init_object();
         ezjson_object_set_string(hJson, "text", szMessage);
@@ -489,7 +489,7 @@ public MatterIncomingMessage(EzHttpRequest:request)
     
     ezjson_serial_to_string(hRequestHandle, szIncomingMessage, charsmax(szIncomingMessage));
 
-    replace_all(szIncomingMessage, charsmax(szIncomingMessage), "^%", "");
+    replace_string(szIncomingMessage, charsmax(szIncomingMessage), "^%", "");
 
     hJson = ezjson_parse(szIncomingMessage);
 
@@ -572,11 +572,11 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
             {
                 new bool:bIsRed = containi(szUserName, "!b") ? false : true;
 
-                replace_all(szUserName, charsmax(szUserName), "!n", "^1");
-                replace_all(szUserName, charsmax(szUserName), "!r", "^3");
-                replace_all(szUserName, charsmax(szUserName), "!b", "^3");
-                replace_all(szUserName, charsmax(szUserName), "!g", "^4");
-                replace_all(g_szForcePrefix, charsmax(g_szForcePrefix), "!t", TEAM_COLOR_PLACEHOLDER);
+                replace_string(szUserName, charsmax(szUserName), "!n", "^1");
+                replace_string(szUserName, charsmax(szUserName), "!r", "^3");
+                replace_string(szUserName, charsmax(szUserName), "!b", "^3");
+                replace_string(szUserName, charsmax(szUserName), "!g", "^4");
+                replace_string(g_szForcePrefix, charsmax(g_szForcePrefix), "!t", TEAM_COLOR_PLACEHOLDER);
 
                 if(strlen(g_szForcePrefix) > 0)
                     formatex(szMessageNew, charsmax(szMessageNew), g_bIncomingDontColorize ? "%s %s^1: %s" : "^4%s %s^1: %s", g_szForcePrefix, szUserName, szMessage);
@@ -625,8 +625,8 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
     copy(szFixedUserName, charsmax(szFixedUserName), szUserName);
 
     // the following symbols are known to glitch out the chat
-    replace_all(szFixedUserName, charsmax(szFixedUserName), "#", "¤");
-    // replace_all(szFixedUserName, charsmax(szFixedUserName), "@", "¤"); // apparently it only causes problems in Windows clients
+    replace_string(szFixedUserName, charsmax(szFixedUserName), "#", "¤");
+    // replace_string(szFixedUserName, charsmax(szFixedUserName), "@", "¤"); // apparently it only causes problems in Windows clients
 
     new szTemporaryNameBuffer[MAX_NAME_LENGTH], szUserInfoBuffer[256];
     new bool:bShouldRevertName = false;
@@ -682,7 +682,7 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
         message_end();
     }
 
-    replace_all(szFormattedMessage, charsmax(szFormattedMessage), "^n", "");
+    replace_string(szFormattedMessage, charsmax(szFormattedMessage), "^n", "");
 
     server_print(szFormattedMessage);
 
@@ -732,7 +732,7 @@ SayMessage_Process(iClient, iMessageSource)
     read_args(szMessage, charsmax(szMessage));
 
     remove_quotes(szMessage);
-    replace_all(szMessage, charsmax(szMessage), "^"", "\^"");
+    replace_string(szMessage, charsmax(szMessage), "^"", "\^"");
 
     if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
         strip_colors_from_string(szMessage);
@@ -885,7 +885,7 @@ SayMessage_Process(iClient, iMessageSource)
     } 
 
     if(g_bOutgoingZwspAt)
-        replace_all(szMessage, charsmax(szMessage), "@", "@​");
+        replace_string(szMessage, charsmax(szMessage), "@", "@​");
 
     ezjson_object_set_string(hJson, "text", szMessage);
     ezjson_object_set_string(hJson, "username", (iClient) ? szUserName : g_szOutgoingSystemUsername);
@@ -934,7 +934,7 @@ SayMessage_Process(iClient, iMessageSource)
             }
 
             //Matterbridge messages already come with a line end character, this ensures correct console display
-            replace_all(szMessage, charsmax(szMessage), "^n", ""); 
+            replace_string(szMessage, charsmax(szMessage), "^n", ""); 
             
             server_print("%s: %s", szUserName, szMessage);
             return PLUGIN_HANDLED;
@@ -982,15 +982,15 @@ public Event_PlayerKilled(iClient, iAttacker)
     else
         pev(iAttacker, pev_classname, szAttackerName, charsmax(szAttackerName)); //todo: get the monster name in Sven Co-op
 
-    replace_all(szUserName, charsmax(szUserName), "^"", "");
-    replace_all(szAttackerName, charsmax(szAttackerName), "^"", ""); 
+    replace_string(szUserName, charsmax(szUserName), "^"", "");
+    replace_string(szAttackerName, charsmax(szAttackerName), "^"", ""); 
 
     formatex(szMessage, charsmax(szMessage), "%L", LANG_SERVER, "MATTERAMXX_MESSAGE_KILLED", szUserName, szAttackerName);
 
     new EzJSON:hJson = ezjson_init_object();
 
     if(g_bOutgoingZwspAt)
-        replace_all(szMessage, charsmax(szMessage), "@", "@​");
+        replace_string(szMessage, charsmax(szMessage), "@", "@​");
 
     ezjson_object_set_string(hJson, "text", szMessage);
     ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
@@ -1015,7 +1015,7 @@ public send_message_custom(iPlugin, iParams)
     new EzJSON:hJson = ezjson_init_object();
 
     if(g_bOutgoingZwspAt)
-        replace_all(szMessage, charsmax(szMessage), "@", "@​");
+        replace_string(szMessage, charsmax(szMessage), "@", "@​");
 
     ezjson_object_set_string(hJson, "text", szMessage);
     ezjson_object_set_string(hJson, "username", empty(szUsername) ? g_szOutgoingSystemUsername : szUsername);
@@ -1103,7 +1103,7 @@ HandleDisconnectEvent(iClient)
             get_colorless_name(iClient, szUserName, charsmax(szUserName));
         else
             get_user_name(iClient, szUserName, charsmax(szUserName));
-        replace_all(szUserName, charsmax(szUserName), "^"", "");
+        replace_string(szUserName, charsmax(szUserName), "^"", "");
 
         if(g_bOutgoingJoinQuitPlayerCount)
             formatex(szMessage, charsmax(szMessage), "%L [%d/%d]", LANG_SERVER, "MATTERAMXX_MESSAGE_LEFT", szUserName, get_playersnum_ex((g_bOutgoingIgnoreBots ? GetPlayers_ExcludeBots : GetPlayers_None) | (g_bOutgoingIgnoreHLTV ? GetPlayers_ExcludeHLTV : GetPlayers_None))-1, get_maxplayers());
@@ -1112,7 +1112,7 @@ HandleDisconnectEvent(iClient)
         g_bUserConnected[iClient] = false;
 
         if(g_bOutgoingZwspAt)
-            replace_all(szMessage, charsmax(szMessage), "@", "@​");
+            replace_string(szMessage, charsmax(szMessage), "@", "@​");
         
         new EzJSON:hJson = ezjson_init_object();
         ezjson_object_set_string(hJson, "text", szMessage);
@@ -1158,7 +1158,7 @@ ShowJoinMessage(iClient)
     else
         get_user_name(iClient, szUserName, charsmax(szUserName));
 
-    replace_all(szUserName, charsmax(szUserName), "^"", "");
+    replace_string(szUserName, charsmax(szUserName), "^"", "");
 
     if(g_bOutgoingJoinQuitPlayerCount)
         formatex(szMessage, charsmax(szMessage), "%L [%d/%d]", LANG_SERVER, "MATTERAMXX_MESSAGE_JOINED", szUserName, get_playersnum_ex((g_bOutgoingIgnoreBots ? GetPlayers_ExcludeBots : GetPlayers_None) | (g_bOutgoingIgnoreHLTV ? GetPlayers_ExcludeHLTV : GetPlayers_None)), get_maxplayers());
@@ -1169,7 +1169,7 @@ ShowJoinMessage(iClient)
     g_szLastMessages[iClient] = "";
 
     if(g_bOutgoingZwspAt)
-        replace_all(szMessage, charsmax(szMessage), "@", "@​");
+        replace_string(szMessage, charsmax(szMessage), "@", "@​");
     
     new EzJSON:hJson = ezjson_init_object();
     ezjson_object_set_string(hJson, "text", szMessage);
