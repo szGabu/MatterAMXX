@@ -38,14 +38,6 @@
 
 #pragma semicolon 1
 
-enum
-{
-	RENDER_MODE = 0,
-	RENDER_AMT,
-	RENDER_FX,
-	MAX_RENDER
-}
-
 new g_cvarEnabled;
 new g_cvarSystemAvatarUrl;
 new g_cvarAutogenAvatarUrl;
