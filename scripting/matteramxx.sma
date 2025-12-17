@@ -362,8 +362,25 @@ public OnConfigsExecuted()
         }
 
         g_iPluginFlags = plugin_flags();
-        g_hIncomingPattern = regex_compile_ex(g_szIncomingIgnorePrefix);
-        g_hSteamPattern = regex_compile_ex(REGEX_STEAMID_PATTERN);
+        new szRegexError[128], iErrorCode;
+        g_hIncomingPattern = regex_compile_ex(g_szIncomingIgnorePrefix, 0, szRegexError, charsmax(szRegexError), iErrorCode);
+        
+        if(_:g_hIncomingPattern == -1)
+            set_fail_state("Fatal Error: Invalid regex handle for g_szIncomingIgnorePrefix. Error code %d: %s", iErrorCode, szRegexError);
+        
+        g_hSteamPattern = regex_compile_ex(REGEX_STEAMID_PATTERN, 0, szRegexError, charsmax(szRegexError), iErrorCode);
+        if(_:g_hSteamPattern == -1)
+            set_fail_state("Fatal Error: Invalid regex handle for g_hSteamPattern. Error code %d: %s", iErrorCode, szRegexError);
+
+        // we are ready to check for steam validity in case we already have players
+        new rgPlayers[MAX_PLAYERS], iNumPlayers;
+        get_players_ex(rgPlayers, iNumPlayers, GetPlayers_ExcludeBots);
+        for(new iIndex = 0; iIndex < iNumPlayers; iIndex++)
+        {
+            new iClient = rgPlayers[iIndex];
+            if(is_user_authorized(iClient))
+                ValidateUser(iClient);
+        }
     }
     else
         pause("ad");
@@ -372,7 +389,7 @@ public OnConfigsExecuted()
 public PrepareBridgeUrl()
 {
     formatex(g_szBridgeUrl, charsmax(g_szBridgeUrl), "%s://%s", g_szBridgeProtocol, g_szBridgeHost);
-    if(!empty(g_szBridgePort))
+    if(!StrEmpty(g_szBridgePort))
     {
         add(g_szBridgeUrl, charsmax(g_szBridgeUrl), ":");
         add(g_szBridgeUrl, charsmax(g_szBridgeUrl), g_szBridgePort);
@@ -405,11 +422,11 @@ public Task_JoinDelayDone()
         new EzJSON:hJson = ezjson_init_object();
         ezjson_object_set_string(hJson, "text", szMessage);
         ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
-        if(!empty(g_szSystemAvatarUrl))
+        if(!StrEmpty(g_szSystemAvatarUrl))
             ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
         ezjson_object_set_string(hJson, "userid", SYSMES_ID);
 
-        send_message_rest(hJson, g_szGateway);
+        SendMessageREST(hJson, g_szGateway);
     }
 }
 
@@ -425,7 +442,7 @@ public MatterConnectAPI()
 
     new EzHttpOptions:ezIncomingHeader = ezhttp_create_options();
 
-    if(!empty(g_szBridgeToken))
+    if(!StrEmpty(g_szBridgeToken))
     {
         new szTokenHeader[JSON_PARAMETER_LENGTH];
         formatex(szTokenHeader, charsmax(szTokenHeader), "Bearer %s", g_szBridgeToken);
@@ -540,15 +557,15 @@ public MatterPrintMessage(const szMessage[], szUserName[MAX_NAME_LENGTH], szProt
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::MatterPrintMessage() - Check prefix value", __BINARY__);
 
-            if(prefix_matches(szMessage))
+            if(PrefixMatches(szMessage))
                 return;
 
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::MatterPrintMessage() - Not returning", __BINARY__);
 
-            if(empty(szUserName))
+            if(StrEmpty(szUserName))
                 copy(szUserName, charsmax(szUserName), g_szOutgoingSystemUsername);
-            if(empty(szProtocol))
+            if(StrEmpty(szProtocol))
                 copy(szProtocol, charsmax(szProtocol), g_szGamename);
 
             if(g_hCurrentGame == GAME_CSTRIKE || g_hCurrentGame == GAME_CZERO || g_hCurrentGame == GAME_DOD) 
@@ -616,7 +633,7 @@ PrintRelayUser(const szMessage[], const szUserName[], iClient = 0)
     if(iClient == 0)
     {
         // we need to use a player as a relay to preserve correct text rendering
-        iClient = get_suitable_target();
+        iClient = GetPlayerChatProxy();
         if(iClient > 0)
         {
             bShouldRevertName = true;
@@ -718,7 +735,7 @@ SayMessage_Process(iClient, iMessageSource)
     replace_string(szMessage, charsmax(szMessage), "^"", "\^"");
 
     if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
-        strip_colors_from_string(szMessage);
+        StripColorCodesFromString(szMessage);
 
     trim(szMessage);
 
@@ -786,15 +803,15 @@ SayMessage_Process(iClient, iMessageSource)
     if(g_iOutgoingPrefixDeadStatus & iMessageSource && !is_user_alive(iClient) && !bIsSpectator)
         format(szMessage, charsmax(szMessage), "%s %s", DEAD_SYMBOL, szMessage);
 
-    if(!empty(g_szOutgoingRequirePrefix) && szMessage[0] != g_szOutgoingRequirePrefix[0])
+    if(!StrEmpty(g_szOutgoingRequirePrefix) && szMessage[0] != g_szOutgoingRequirePrefix[0])
         return PLUGIN_CONTINUE;
-    else if(!empty(g_szOutgoingRequirePrefix))
+    else if(!StrEmpty(g_szOutgoingRequirePrefix))
         format(szMessage, charsmax(szMessage), "%s" , szMessage[strlen(g_szOutgoingRequirePrefix)]); 
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
         server_print("[DEBUG] %s::Event_SayMessage() - Message ^"%s^" was sent.", __BINARY__, szMessage);
 
-    if(empty(szMessage) || (g_bOutgoingNoRepeat && equal(szMessage, g_szLastMessages[iClient])))
+    if(StrEmpty(szMessage) || (g_bOutgoingNoRepeat && equal(szMessage, g_szLastMessages[iClient])))
     {
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
         {
@@ -817,7 +834,7 @@ SayMessage_Process(iClient, iMessageSource)
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
             server_print("[DEBUG] %s::Event_SayMessage() - iClient is %i.", __BINARY__, iClient);
         if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
-            get_colorless_name(iClient, szUserName, charsmax(szUserName));
+            GetColorlessName(iClient, szUserName, charsmax(szUserName));
         else
             get_user_name(iClient, szUserName, charsmax(szUserName));
 
@@ -829,7 +846,7 @@ SayMessage_Process(iClient, iMessageSource)
             server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is %s.", __BINARY__, szSteamId);
         }
 
-        if(!empty(szSteamId))
+        if(!StrEmpty(szSteamId))
         {
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is from a player.", __BINARY__);
@@ -838,17 +855,17 @@ SayMessage_Process(iClient, iMessageSource)
             {
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
                     server_print("[DEBUG] %s::Event_SayMessage() - User is authenticated.", __BINARY__);
-                if(!empty(g_szAvatarUrl))
+                if(!StrEmpty(g_szAvatarUrl))
                     formatex(szAvatarUrlFull, charsmax(szAvatarUrlFull), g_szAvatarUrl, szSteamId);
             }
             else
             {
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
                     server_print("[DEBUG] %s::Event_SayMessage() - User not is authenticated.", __BINARY__);
-                if(!empty(g_szAutogenAvatarUrl))
+                if(!StrEmpty(g_szAutogenAvatarUrl))
                 {
                     new szEncodedName[MAX_NAME_LENGTH];
-                    url_encode(szUserName, szEncodedName, charsmax(szEncodedName));
+                    EncodeURL(szUserName, szEncodedName, charsmax(szEncodedName));
                     formatex(szAvatarUrlFull, charsmax(szAvatarUrlFull), g_szAutogenAvatarUrl, szEncodedName);
                 }
             }
@@ -856,10 +873,10 @@ SayMessage_Process(iClient, iMessageSource)
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::Event_SayMessage() - Resulting avatar URL is %s.", __BINARY__, szAvatarUrlFull);
 
-            if(!empty(szAvatarUrlFull))
+            if(!StrEmpty(szAvatarUrlFull))
                 ezjson_object_set_string(hJson, "avatar", szAvatarUrlFull);
         }
-        else if(!empty(g_szSystemAvatarUrl))
+        else if(!StrEmpty(g_szSystemAvatarUrl))
         {
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
                 server_print("[DEBUG] %s::Event_SayMessage() - The server sent this message.", __BINARY__);
@@ -876,7 +893,7 @@ SayMessage_Process(iClient, iMessageSource)
 
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
         server_print("[DEBUG] %s::Event_SayMessage() - I'm going to send the message.", __BINARY__);
-    send_message_rest(hJson, g_szGateway);
+    SendMessageREST(hJson, g_szGateway);
 
     if(g_bOutgoingPassthrough)
     {
@@ -945,7 +962,7 @@ public Event_PlayerKilled(iClient, iAttacker)
     new szUserName[MAX_NAME_LENGTH], szAttackerName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
     
     if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
-        get_colorless_name(iClient, szUserName, charsmax(szUserName));
+        GetColorlessName(iClient, szUserName, charsmax(szUserName));
     else
         get_user_name(iClient, szUserName, charsmax(szUserName));
 
@@ -958,7 +975,7 @@ public Event_PlayerKilled(iClient, iAttacker)
             return;
             
         if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
-            get_colorless_name(iAttacker, szAttackerName, charsmax(szAttackerName));
+            GetColorlessName(iAttacker, szAttackerName, charsmax(szAttackerName));
         else
             get_user_name(iAttacker, szAttackerName, charsmax(szAttackerName));
     }
@@ -977,11 +994,11 @@ public Event_PlayerKilled(iClient, iAttacker)
 
     ezjson_object_set_string(hJson, "text", szMessage);
     ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
-    if(!empty(g_szSystemAvatarUrl))
+    if(!StrEmpty(g_szSystemAvatarUrl))
         ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
     ezjson_object_set_string(hJson, "userid", SYSMES_ID);
 
-    send_message_rest(hJson, g_szGateway);
+    SendMessageREST(hJson, g_szGateway);
 }
 
 public send_message_custom(iPlugin, iParams)
@@ -1001,14 +1018,14 @@ public send_message_custom(iPlugin, iParams)
         replace_string(szMessage, charsmax(szMessage), "@", "@​");
 
     ezjson_object_set_string(hJson, "text", szMessage);
-    ezjson_object_set_string(hJson, "username", empty(szUsername) ? g_szOutgoingSystemUsername : szUsername);
-    ezjson_object_set_string(hJson, "avatar", empty(szAvatar) ? g_szSystemAvatarUrl : szAvatar);
+    ezjson_object_set_string(hJson, "username", StrEmpty(szUsername) ? g_szOutgoingSystemUsername : szUsername);
+    ezjson_object_set_string(hJson, "avatar", StrEmpty(szAvatar) ? g_szSystemAvatarUrl : szAvatar);
     ezjson_object_set_string(hJson, "userid", bSystem ? SYSMES_ID : "");
 
-    send_message_rest(hJson, empty(sGateway) ? g_szGateway : sGateway);
+    SendMessageREST(hJson, StrEmpty(sGateway) ? g_szGateway : sGateway);
 }
 
-public outgoing_message(EzHttpRequest:hRequest)
+public OnOutgoingMessageResponse(EzHttpRequest:hRequest)
 {
     if(g_iPluginFlags & AMX_FLAG_DEBUG)
     {
@@ -1044,10 +1061,10 @@ public outgoing_message(EzHttpRequest:hRequest)
 
 public client_authorized(iClient)
 {
-    new szAuthId[MAX_AUTHID_LENGTH];
-    get_user_authid(iClient, szAuthId, charsmax(szAuthId));
-    if(is_valid_authid(szAuthId))
-        g_bUserAuthenticated[iClient] = 1;
+    //sometimes this will be called before OnConfigsExecuted, so it's dangerous to do this
+    //because g_hSteamPattern may not be initialized yet
+    if(g_hSteamPattern)
+        ValidateUser(iClient);
 }
 
 #if USE_DEPRECATED_DISCONNECT_FORWARD
@@ -1083,7 +1100,7 @@ HandleDisconnectEvent(iClient)
             
         new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
         if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
-            get_colorless_name(iClient, szUserName, charsmax(szUserName));
+            GetColorlessName(iClient, szUserName, charsmax(szUserName));
         else
             get_user_name(iClient, szUserName, charsmax(szUserName));
         replace_string(szUserName, charsmax(szUserName), "^"", "");
@@ -1100,11 +1117,11 @@ HandleDisconnectEvent(iClient)
         new EzJSON:hJson = ezjson_init_object();
         ezjson_object_set_string(hJson, "text", szMessage);
         ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
-        if(!empty(g_szSystemAvatarUrl))
+        if(!StrEmpty(g_szSystemAvatarUrl))
             ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
         ezjson_object_set_string(hJson, "userid", SYSMES_ID);
 
-        send_message_rest(hJson, g_szGateway);
+        SendMessageREST(hJson, g_szGateway);
     }
 }
 
@@ -1113,17 +1130,24 @@ public client_putinserver(iClient)
     if(g_bOutgoingJoin && g_bJoinDelayDone)
     {
         if(g_fOutgoingJoinWait > 0.0)
-            set_task(g_fOutgoingJoinWait, "client_putinserver_delayed", get_user_userid(iClient));
+            set_task(g_fOutgoingJoinWait, "Task_ClientPutInServerDelayed", get_user_userid(iClient));
         else
             ShowJoinMessage(iClient);
     }
 }
 
-public client_putinserver_delayed(iUserId)
+public Task_ClientPutInServerDelayed(iUserId)
 {
     new iClient = find_player_ex(FindPlayer_MatchUserId, iUserId);
     if(iClient)
         ShowJoinMessage(iClient);
+}
+
+ValidateUser(iClient)
+{
+    new szAuthId[MAX_AUTHID_LENGTH];
+    get_user_authid(iClient, szAuthId, charsmax(szAuthId));
+    g_bUserAuthenticated[iClient] = IsValidAuthID(szAuthId);
 }
 
 ShowJoinMessage(iClient)
@@ -1137,7 +1161,7 @@ ShowJoinMessage(iClient)
     new szUserName[MAX_NAME_LENGTH], szMessage[MESSAGE_LENGTH];
 
     if((g_hCurrentGame == GAME_VALVE || g_hCurrentGame == GAME_ADRENALINE_GAMER) && g_bOutgoingStripColors)
-        get_colorless_name(iClient, szUserName, charsmax(szUserName));
+        GetColorlessName(iClient, szUserName, charsmax(szUserName));
     else
         get_user_name(iClient, szUserName, charsmax(szUserName));
 
@@ -1157,14 +1181,14 @@ ShowJoinMessage(iClient)
     new EzJSON:hJson = ezjson_init_object();
     ezjson_object_set_string(hJson, "text", szMessage);
     ezjson_object_set_string(hJson, "username", g_szOutgoingSystemUsername);
-    if(!empty(g_szSystemAvatarUrl))
+    if(!StrEmpty(g_szSystemAvatarUrl))
         ezjson_object_set_string(hJson, "avatar", g_szSystemAvatarUrl);
     ezjson_object_set_string(hJson, "userid", SYSMES_ID);
 
-    send_message_rest(hJson, g_szGateway);
+    SendMessageREST(hJson, g_szGateway);
 }
 
-stock get_suitable_target()
+GetPlayerChatProxy()
 {
     // First try to find HLTV proxy
     for (new iClient = 1; iClient <= MaxClients; iClient++) 
@@ -1191,19 +1215,19 @@ stock get_suitable_target()
     return 0;
 }
 
-stock empty(const szString[])
+StrEmpty(const szString[])
 {
     return !szString[0];
 }
 
 //thanks to YaLTeR
-stock get_colorless_name(iClient, szName[], iLen)
+GetColorlessName(iClient, szName[], iLen)
 {
     get_user_name(iClient, szName, iLen);
-    strip_colors_from_string(szName);
+    StripColorCodesFromString(szName);
 }
 
-stock strip_colors_from_string(szMessage[])
+StripColorCodesFromString(szMessage[])
 {
 	// Clear out color codes
 	new i, j;
@@ -1226,7 +1250,7 @@ stock strip_colors_from_string(szMessage[])
 }
 
 //thanks to Th3-822
-stock url_encode(const szString[], szResult[], iLen)
+EncodeURL(const szString[], szResult[], iLen)
 {
     new from, c, to;
 
@@ -1269,7 +1293,7 @@ stock url_encode(const szString[], szResult[], iLen)
     }
 }
 
-stock send_message_rest(EzJSON:hJson, const szGateway[])
+SendMessageREST(EzJSON:hJson, const szGateway[])
 {
     ezjson_object_set_string(hJson, "gateway", szGateway);
     ezjson_object_set_string(hJson, "protocol", g_szGamename);
@@ -1281,7 +1305,7 @@ stock send_message_rest(EzJSON:hJson, const szGateway[])
 
     ezhttp_option_set_header(ezOutgoingHeader, "Content-Type", "application/json");
 
-    if(!empty(g_szBridgeToken))
+    if(!StrEmpty(g_szBridgeToken))
     {
         new szTokenHeader[JSON_PARAMETER_LENGTH];
         formatex(szTokenHeader, charsmax(szTokenHeader), "Bearer %s", g_szBridgeToken);
@@ -1289,23 +1313,21 @@ stock send_message_rest(EzJSON:hJson, const szGateway[])
     }
 
     ezhttp_option_set_body(ezOutgoingHeader, szPayload);
-    ezhttp_post(g_szOutgoingUri, "outgoing_message", ezOutgoingHeader);
+    ezhttp_post(g_szOutgoingUri, "OnOutgoingMessageResponse", ezOutgoingHeader);
 
     ezjson_free(hJson);
 }
 
-stock is_valid_authid(szAuthId[]) 
+IsValidAuthID(szAuthId[]) 
 {
-    new Regex:hHandle = Regex:regex_match_c(szAuthId, g_hSteamPattern);
-    new bool:bValid = hHandle > REGEX_NO_MATCH;
-    regex_free(hHandle);
+    new iResults = regex_match_c(szAuthId, g_hSteamPattern);
+    new bool:bValid = iResults > 0;
     return bValid;
 }
 
-stock prefix_matches(const szMessage[]) 
+PrefixMatches(const szMessage[]) 
 {
-    new Regex:hHandle = Regex:regex_match_c(szMessage, g_hIncomingPattern);
-    new bool:bMatches = hHandle > REGEX_NO_MATCH;
-    regex_free(hHandle);
+    new iResults = regex_match_c(szMessage, g_hIncomingPattern);
+    new bool:bMatches = iResults > 0;
     return bMatches;
 }
