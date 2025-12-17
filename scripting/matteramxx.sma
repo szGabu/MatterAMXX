@@ -1069,22 +1069,11 @@ public client_authorized(iClient)
 
 #if USE_DEPRECATED_DISCONNECT_FORWARD
 public client_disconnect(iClient)
-{
-    if(g_hCurrentGame == GAME_SVENCOOP)
-    {
-        //ditto plugin_init()
-        HandleDisconnectEvent(iClient);
-    }
-}
-#endif
-
+#else
 public client_disconnected(iClient)
+#endif
 {
-    if(g_hCurrentGame != GAME_SVENCOOP)
-    {
-        //ditto plugin_init()
-        HandleDisconnectEvent(iClient);
-    }
+    HandleDisconnectEvent(iClient);
 }
 
 HandleDisconnectEvent(iClient)
