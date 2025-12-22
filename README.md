@@ -1,10 +1,10 @@
+![](https://github.com/user-attachments/assets/0377e68c-8930-4912-9de8-b92b7b711f5a)
 
-![](https://forums.alliedmods.net/image-proxy/29634d69f9657c78959c33f2b40e4ead3fb76dc6/68747470733a2f2f692e696d6775722e636f6d2f494478794c556b2e706e67)
 # MatterAMXX
 Powered by Matterbridge, MatterAMXX is a plugin for AMXX that allows simple bridging between your game servers, Mattermost, IRC, XMPP, Gitter, Slack, Discord, Telegram, and more.  
-  
-![](https://forums.alliedmods.net/image-proxy/0d6f7b0bf8a787250a699a1560f519e37797c159/68747470733a2f2f692e696d6775722e636f6d2f725164567549782e706e67)
-  
+
+![](https://github.com/user-attachments/assets/ff38f893-f722-48ff-bb06-63ae15649168)
+
 ## Description
   
 Using Matterbridge API, this plugin allows you to bridge your game server with a Matterbridge installation, relaying messages from/to a growing number of protocols.  
@@ -17,7 +17,6 @@ You can also bridge multiple servers together so the players can chat between ea
 - Mattermost
 - IRC
 - XMPP
-- Gitter
 - Slack
 - Discord
 - Telegram
@@ -42,10 +41,11 @@ You can also bridge multiple servers together so the players can chat between ea
   
 This plugin requires the following to work:
 
-- **[GoldSrc Rest In Pawn (gRIP)](https://forums.alliedmods.net/showthread.php?t=315567)**
+- **[AmxxEasyHttp](https://github.com/Next21Team/AmxxEasyHttp)**
 - **[A working Matterbridge installation](https://github.com/42wim/matterbridge/wiki/How-to-create-your-config)**
+- **[Fake RCON](https://forums.alliedmods.net/showthread.php?t=326556)** (Optional, required by the MatterAMXX Lag Checker and MatterAMXX Console sub-plugins)
 
-  
+
 ## Supported Games
 This plugin is supposed to be mod agnostic. All official games should work out of the box
 
@@ -57,14 +57,8 @@ This plugin is supposed to be mod agnostic. All official games should work out o
 - Day of Defeat
 - Team Fortress Classic
 - Deathmatch Classic
-
-  
-Kill feed feature will also work in mods where a proper hamdata.ini table is provided
-
 - The Specialists
 - Sven Co-op
-
-  
   
 ### Tested Games
 
@@ -74,11 +68,11 @@ Kill feed feature will also work in mods where a proper hamdata.ini table is pro
 - The Specialists
 
   
-## Installation Instructions
+## Build Instructions
 
 - Download all requirements, plus the .sma file.
 - Place include files in the /scripting/includes directory.
-- Compile the plugin and install the newly generated .amxx file. (Remember to install the latest version of GRIP in your server)
+- Compile the plugin and install the newly generated .amxx file. (Remember to install the latest version of AmxxEasyHttp in your server)
 
   
 ## Setting up MatterAMXX
@@ -95,9 +89,9 @@ Buffer=1000
 RemoteNickFormat="{NICK}"
 ```
 
-Where "myserver" is goes the name of the relay, you can put anything.  
+Where "myserver" is goes the name of the relay, you can put anything, same with the port and Token, this is where the plugin will be listening.
   
-Find your gateway where you want to relay the messages.  
+After that, find or create a gateway where you want to relay the messages. The following is an example of where you will bridge the HLDS server (using the API created below) and a Discord server. It is assumed the Discord entry already exists in the file.
 
 ```
 [[gateway]]  
@@ -134,94 +128,7 @@ Remember that the plugin requires the latest version of MatterAMXX to be running
   
 ## Console Variables 
 
-- **amx_matter_enable**
-    - Enables the plugin.
-    - Default: `1`
-- **amx_matter_bridge_url**
-    - URL and port where the bridge is located.
-    - Default: `http://localhost:1337`
-- **amx_matter_system_avatar**
-    - URL pointing to a picture that will be used as avatar image in system messages. (In protocols that support it)
-    - Default: `[empty string]`
-- **amx_matter_autogenerate_avatar**
-    - URL pointing to a picture that will be used as avatar image in unauthenticated player messages. (In protocols that support it)
-    - This will mostly affect LAN servers, ID_PENDING cases, cases where Steam might be down and other specific cases.
-    - This is generated on the user's nickname, so you must provide a link to Gravatar, Identicons, etc.
-    - Default: `[empty string]`
-- **amx_matter_player_avatar**
-    - URL pointing to a picture that will be used as avatar image in player messages. (In protocols that support it)
-    - Note that this is dynamic based on the user's Steam ID64, if it can't be retrieved the message won't have any avatar.
-    - Upload the PHP file I provided to your file server and use it in this cvar like `http://localhost/avatars/get_avatar.php?steamid=%s`.
-    - See "Avatar Spoofing" for more information.
-    - Default: `[empty string]`
-- **amx_matter_bridge_gateway**
-    - Gateway name to connect.
-    - Default: `[varies, depends on the game]`
-- **amx_matter_bridge_token**
-    - String token to authenticate, it's recommended that you set it up, but it will accept any connection by default.
-    - Default: `[empty string]`
-- **amx_matter_bridge_incoming**
-    - Enables incoming messages (protocols to server).
-    - Default: `1`
-- **amx_matter_incoming_update_time**
-    - Specifies how many seconds it has to wait before querying new incoming messages.
-    - Performance wise is tricky, lower values mean the messages will be queried instantly, while higher values will wait and bring all messages at once, both cases may cause overhead. Experiment and see what's ideal for your server.
-    - No effect if `amx_matter_bridge_incoming` is `0`.
-    - Default: `3.0`
-- **amx_matter_bridge_outgoing**
-    - Enables outgoing messages (server to protocols).
-    - Default: `1`
-- **amx_matter_bridge_outgoing_display_map**
-    - Display the current map at the start of every session.
-    - Default: `1`
-- **amx_matter_bridge_outgoing_strip_colors**
-    - Strip color codes from player names.
-    - It will only affect Half-Life and Adrenaline Gamer.
-        - No effect in other games.
-    - No effect if `amx_matter_bridge_outgoing` is `0`.
-    - Default: `1`
-- **amx_matter_bridge_outgoing_system_username**
-    - Name of the "user" when relying system messages.
-    - No effect if `amx_matter_bridge_outgoing` is `0`.
-    - Default: `[your server name]`
-- **amx_matter_bridge_outgoing_chat**
-    - Transmit chat messages.
-    - No effect if `amx_matter_bridge_outgoing` is `0`.
-    - Default: `1`
-- **amx_matter_bridge_outgoing_chat_no_repeat**
-    - Implement basic anti-spam filter. Useful for preventing taunt binds from sending multiple times.
-    - No effect if `amx_matter_bridge_outgoing_chat` is `0`.
-    - No effect if `amx_matter_bridge_outgoing` is `0`.
-    - Default: `1`
-- **amx_matter_bridge_outgoing_kills**
-    - Transmit kill feed.
-    - It's recommended that you to turn it off on heavy activity servers (Like CSDM/Half-Life servers with tons of players)
-    - No effect if `amx_matter_bridge_outgoing` is `0`.
-    - Default `1`
-- **amx_matter_bridge_outgoing_join**
-    - Transmit when people join the server.
-    - No effect if `amx_matter_bridge_outgoing` is `0`.
-    - Default: `1`
-- **amx_matter_bridge_outgoing_join_delay**
-    - Specify how many seconds the server has to wait before sending Join messages..
-    - No effect if `amx_matter_bridge_outgoing_join` is `0`.
-    - Default: `30.0`
-- **amx_matter_bridge_outgoing_quit**
-    - Transmit when people leave the server.
-    - No effect if `amx_matter_bridge_outgoing` is `0`.
-    - Default: `1`
-- **amx_matter_bridge_outgoing_quit_ignore_intermission**
-    - Specify if the server shouldn't send quit messages if the server reached the intermission state.
-    - No effect if `amx_matter_bridge_outgoing_quit` is `0`.
-    - Default: `0`
-- **amx_matter_bridge_outgoing_joinquit_count**
-    - Display playercount on each Join/Quit message.
-    - No effect if both `amx_matter_bridge_outgoing_quit` and `amx_matter_bridge_outgoing_join` are `0`.
-    - Default: `1`
-- **amx_matter_bridge_retry_delay**
-    - In seconds, how long the server has wait before retrying a connection when it was interrupted.
-    - No effect if `amx_matter_bridge_outgoing` is `0`.
-    - Default: `3.0`
+moved to the wiki
   
 # Credits
 
@@ -230,4 +137,9 @@ Remember that the plugin requires the latest version of MatterAMXX to be running
 - Michael Wieland  
     _His MatterBukkit plugin for Minecraft inspired me to create this._
 - Th3-822  
-    _Helped me finding some bugs._
+    _Helped me finding some bugs. Created the wonderful Fake RCON API_
+- 7mochi  
+    _[Ported MatterAMXX to AmxxEasyHttp](https://github.com/szGabu/MatterAMXX/commit/2d048eb8d66c5545890240c33e7aa2085745d598)_
+
+
+![Alt](https://repobeats.axiom.co/api/embed/b5aa0a7891e68aee6ad9160b5602be5566496350.svg "Repobeats analytics image")
