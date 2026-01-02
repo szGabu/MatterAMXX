@@ -41,12 +41,11 @@
 new g_cvarEnabled;
 new g_cvarSystemAvatarUrl;
 new g_cvarAutogenAvatarUrl;
-new g_cvarAvatarUrl;
 new g_cvarBridgeProtocol;
 new g_cvarBridgeHost;
 new g_cvarBridgePort;
 new g_cvarBridgeGateway;
-new g_cvarToken;
+new g_cvarBridgeToken;
 new g_cvarUseRelayUser;
 new g_cvarIncoming;
 new g_cvarIncoming_DontColorize;
@@ -75,10 +74,10 @@ new g_cvarOutgoing_JoinQuit_ShowCount;
 new g_cvarOutgoing_StripColors;
 new g_cvarOutgoing_DisplayMap;
 new g_cvarRetry_Delay;
+new g_cvarSteamToken;
 
 new bool:g_bEnabled;
 
-new g_szAvatarUrl[BASE_URL_LENGTH];
 new g_szAutogenAvatarUrl[BASE_URL_LENGTH];
 new g_szSystemAvatarUrl[BASE_URL_LENGTH];
 
@@ -116,6 +115,7 @@ new bool:g_bOutgoingStripColors = false;
 new bool:g_bOutgoingDisplayMap = false;
 new bool:g_bOutgoingJoinQuitPlayerCount = false;
 new Float:g_fRetryDelay = 0.0;
+new g_szSteamToken[BASE_URL_LENGTH];
 
 new g_szIncomingUri[BASE_URL_LENGTH];
 new g_szOutgoingUri[BASE_URL_LENGTH];
@@ -123,12 +123,11 @@ new g_szBridgeUrl[BASE_URL_LENGTH];
 new g_szGateway[MAX_NAME_LENGTH];
 new g_szGamename[MAX_NAME_LENGTH];
 
+new g_szSteamAvatar[MAX_PLAYERS+1][BASE_URL_LENGTH];
 new g_szLastMessages[MAX_PLAYERS+1][MESSAGE_LENGTH];
 new g_bUserConnected[MAX_PLAYERS+1];
 
 new bool:g_bTeamPlay = false;
-
-new g_bUserAuthenticated[MAX_PLAYERS+1];
 
 new bool:g_bJoinDelayDone = false;
 new bool:g_bIsIntermission = false;
@@ -185,7 +184,11 @@ public plugin_natives()
 
 public plugin_init()
 {
+    #if AMXX_VERSION_NUM < 1100
+    register_plugin(MATTERAMXX_PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR, MATTERAMXX_PLUGIN_URL, MATTERAMXX_PLUGIN_DESCRIPTION);
+    #else 
     register_plugin(MATTERAMXX_PLUGIN_NAME, MATTERAMXX_PLUGIN_VERSION, MATTERAMXX_PLUGIN_AUTHOR);
+    #endif
 
     new szServerName[MAX_NAME_LENGTH];
     get_modname(g_szGamename, charsmax(g_szGamename));
@@ -216,14 +219,13 @@ public plugin_init()
     get_cvar_string("hostname", szServerName, charsmax(szServerName));
 
     g_cvarEnabled = create_cvar(                            "amx_matter_enable",                                    "1",                                                  FCVAR_NONE,       "Determines if MatterAMXX should be enabled.");
-    g_cvarSystemAvatarUrl = create_cvar(                    "amx_matter_system_avatar",                             "",                                                   FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in system messages (In protocols that support it).");
-    g_cvarAutogenAvatarUrl = create_cvar(                   "amx_matter_autogenerate_avatar",                       "",                                                   FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in unauthenticated player messages (In protocols that support it). Use %s to pass the name as a parameter.");
-    g_cvarAvatarUrl = create_cvar(                          "amx_matter_player_avatar",                             "",                                                   FCVAR_PROTECTED,  "URL pointing to a picture that will be used as avatar image in player messages (In protocols that support it), note that this is dynamic based on the user's Steam ID64, if it can't be retrieved the message will use unauthenticated avatars. Use %s to pass the SID64 as a parameter.");
+    g_cvarSystemAvatarUrl = create_cvar(                    "amx_matter_system_avatar",                             "",                                                   FCVAR_PROTECTED,  "URL of the image that will be used as avatar in system messages (In protocols that support it).");
+    g_cvarAutogenAvatarUrl = create_cvar(                   "amx_matter_autogenerate_avatar",                       "",                                                   FCVAR_PROTECTED,  "URL of the image that will be used as avatar in unauthenticated player messages (In protocols that support it).^nUse %s to pass the name as a parameter.^nThis will be used is Steam API Token is not provided.");
     g_cvarBridgeProtocol = create_cvar(                     "amx_matter_bridge_protocol",                           "http",                                               FCVAR_PROTECTED,  "Protocol of where the bridge is located.");
     g_cvarBridgeHost = create_cvar(                         "amx_matter_bridge_host",                               "localhost",                                          FCVAR_PROTECTED,  "Host of where the bridge is located.");
     g_cvarBridgePort = create_cvar(                         "amx_matter_bridge_port",                               "1337",                                               FCVAR_PROTECTED,  "Port of where the bridge is located.");
     g_cvarBridgeGateway = create_cvar(                      "amx_matter_bridge_gateway",                            g_szGamename,                                         FCVAR_PROTECTED,  "Gateway name to connect.");
-    g_cvarToken = create_cvar(                              "amx_matter_bridge_token",                              "",                                                   FCVAR_PROTECTED,  "String token to authenticate, it's recommended that you set it up, but it will accept any connection by default.");
+    g_cvarBridgeToken = create_cvar(                        "amx_matter_bridge_token",                              "",                                                   FCVAR_PROTECTED,  "String token to authenticate, it's recommended that you set it up, but it will accept any connection by default.");
     g_cvarIncoming = create_cvar(                           "amx_matter_bridge_incoming",                           "1",                                                  FCVAR_NONE,       "Enables incoming messages (protocols to server).");
     g_cvarIncoming_DontColorize = create_cvar(              "amx_matter_bridge_incoming_dont_colorize",             "0",                                                  FCVAR_NONE,       "For incoming messages and games like Counter-Strike and Day of Defeat only. By default it will colorize any message with a simple format (green username) but if set to 1 it will not colorize anything, leaving the admin to handle any colorization in the matterbridge.toml file.");
     g_cvarIncoming_IgnorePrefix = create_cvar(              "amx_matter_bridge_incoming_ignore_prefix",             "!",                                                  FCVAR_NONE,       "For incoming messages. Messages matching this in the beggining of the message will be ignored by the plugin");
@@ -252,6 +254,7 @@ public plugin_init()
     g_cvarOutgoing_JoinQuit_ShowCount = create_cvar(        "amx_matter_bridge_outgoing_joinquit_count",            "1",                                                  FCVAR_NONE,       "For outgoing messages. Display playercount on each Join/Quit message. No effect if both amx_matter_bridge_outgoing_quit and amx_matter_bridge_outgoing_join are 0.");
     g_cvarForcePrefix = create_cvar(                        "amx_matter_bridge_force_prefix",                       "",                                                   FCVAR_NONE,       "For messages displayed in the in-game chat, the value of this cvar will be always prefixed before the username.");
     g_cvarRetry_Delay = create_cvar(                        "amx_matter_bridge_retry_delay",                        "3.0",                                                FCVAR_NONE,       "In seconds, how long the server has wait before retrying a connection when it was interrupted.");
+    g_cvarSteamToken = create_cvar(                         "amx_matter_bridge_steam_token",                        "",                                                   FCVAR_PROTECTED,  "Steam Web API Token, this is required for player avatars to render.^n^nYou can get one here:^nhttps://steamcommunity.com/dev/apikey");
 
     AutoExecConfig();
 
@@ -271,12 +274,11 @@ public OnConfigsExecuted()
     bind_pcvar_num(g_cvarEnabled, g_bEnabled);
     bind_pcvar_string(g_cvarSystemAvatarUrl, g_szSystemAvatarUrl, charsmax(g_szSystemAvatarUrl));
     bind_pcvar_string(g_cvarAutogenAvatarUrl, g_szAutogenAvatarUrl, charsmax(g_szAutogenAvatarUrl));
-    bind_pcvar_string(g_cvarAvatarUrl, g_szAvatarUrl, charsmax(g_szAvatarUrl));
     bind_pcvar_string(g_cvarBridgeProtocol, g_szBridgeProtocol, charsmax(g_szBridgeProtocol));
     bind_pcvar_string(g_cvarBridgeHost, g_szBridgeHost, charsmax(g_szBridgeHost));
     bind_pcvar_string(g_cvarBridgePort, g_szBridgePort, charsmax(g_szBridgePort));
     bind_pcvar_string(g_cvarBridgeGateway, g_szGateway, charsmax(g_szGateway));
-    bind_pcvar_string(g_cvarToken, g_szBridgeToken, charsmax(g_szBridgeToken));
+    bind_pcvar_string(g_cvarBridgeToken, g_szBridgeToken, charsmax(g_szBridgeToken));
     bind_pcvar_num(g_cvarIncoming, g_bIncomingMessages);
     bind_pcvar_num(g_cvarIncoming_DontColorize, g_bIncomingDontColorize);
     bind_pcvar_string(g_cvarIncoming_IgnorePrefix, g_szIncomingIgnorePrefix, charsmax(g_szIncomingIgnorePrefix));
@@ -305,6 +307,7 @@ public OnConfigsExecuted()
     bind_pcvar_num(g_cvarOutgoing_JoinQuit_ShowCount, g_bOutgoingJoinQuitPlayerCount);
     bind_pcvar_string(g_cvarForcePrefix, g_szForcePrefix, charsmax(g_szForcePrefix));
     bind_pcvar_float(g_cvarRetry_Delay, g_fRetryDelay);
+    bind_pcvar_string(g_cvarSteamToken, g_szSteamToken, charsmax(g_szSteamToken));
     
     new hCvarTeamPlay = get_cvar_pointer("mp_teamplay");
 
@@ -838,36 +841,25 @@ SayMessage_Process(iClient, iMessageSource)
         else
             get_user_name(iClient, szUserName, charsmax(szUserName));
 
-        get_user_info(iClient, "*sid", szSteamId, charsmax(szSteamId));
 
         if(g_iPluginFlags & AMX_FLAG_DEBUG)
-        {
             server_print("[DEBUG] %s::Event_SayMessage() - Fullname is %s.", __BINARY__, szUserName);
-            server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is %s.", __BINARY__, szSteamId);
-        }
-
-        if(!StrEmpty(szSteamId))
+            
+        if(iClient)
         {
-            if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                server_print("[DEBUG] %s::Event_SayMessage() - Steam ID is from a player.", __BINARY__);
             new szAvatarUrlFull[TARGET_URL_LENGTH];
-            if(g_bUserAuthenticated[iClient])
+
+            if(!StrEmpty(g_szSteamAvatar[iClient]))
             {
                 if(g_iPluginFlags & AMX_FLAG_DEBUG)
                     server_print("[DEBUG] %s::Event_SayMessage() - User is authenticated.", __BINARY__);
-                if(!StrEmpty(g_szAvatarUrl))
-                    formatex(szAvatarUrlFull, charsmax(szAvatarUrlFull), g_szAvatarUrl, szSteamId);
+                copy(szAvatarUrlFull, charsmax(szAvatarUrlFull), g_szSteamAvatar[iClient]);
             }
-            else
+            else if(!StrEmpty(g_szAutogenAvatarUrl))
             {
-                if(g_iPluginFlags & AMX_FLAG_DEBUG)
-                    server_print("[DEBUG] %s::Event_SayMessage() - User not is authenticated.", __BINARY__);
-                if(!StrEmpty(g_szAutogenAvatarUrl))
-                {
-                    new szEncodedName[MAX_NAME_LENGTH];
-                    EncodeURL(szUserName, szEncodedName, charsmax(szEncodedName));
-                    formatex(szAvatarUrlFull, charsmax(szAvatarUrlFull), g_szAutogenAvatarUrl, szEncodedName);
-                }
+                new szEncodedName[MAX_NAME_LENGTH];
+                EncodeURL(szUserName, szEncodedName, charsmax(szEncodedName));
+                formatex(szAvatarUrlFull, charsmax(szAvatarUrlFull), g_szAutogenAvatarUrl, szEncodedName);
             }
 
             if(g_iPluginFlags & AMX_FLAG_DEBUG)
@@ -1078,7 +1070,7 @@ public client_disconnected(iClient)
 
 HandleDisconnectEvent(iClient)
 {
-    g_bUserAuthenticated[iClient] = 0;
+    g_szSteamAvatar[iClient] = "";
     if(!g_bIsIntermission && g_bOutgoingLeave && !is_user_bot(iClient) && g_bUserConnected[iClient])
     {
         if(is_user_bot(iClient) && g_bOutgoingIgnoreBots)
@@ -1136,7 +1128,76 @@ ValidateUser(iClient)
 {
     new szAuthId[MAX_AUTHID_LENGTH];
     get_user_authid(iClient, szAuthId, charsmax(szAuthId));
-    g_bUserAuthenticated[iClient] = IsValidAuthID(szAuthId);
+
+    if(IsValidAuthID(szAuthId) && strlen(g_szSteamToken) > 0)
+    {
+        new szApiUrl[TARGET_URL_LENGTH], szSteam64[MAX_STEAM64_LENGTH];
+        get_user_info(iClient, "*sid", szSteam64, charsmax(szSteam64));
+        formatex(szApiUrl, sizeof(szApiUrl), "http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=%s&steamids=%s", g_szSteamToken, szSteam64);
+        ezhttp_get(szApiUrl, "OnPlayerSummaries");
+    }
+}
+
+public OnPlayerSummaries(EzHttpRequest:hRequest)
+{
+    if(ezhttp_get_error_code(hRequest) != EZH_OK)
+    {
+        server_print("[MatterAMXX] %L", LANG_SERVER, "MATTERAMXX_FAILED_RETRIEVE_AVATAR");
+        return;
+    }
+
+    new szResponse[INCOMING_BUFFER_LENGTH], EzJSON:hJson;
+
+    //to do: is this needed?
+    new EzJSON:hRequestHandle = ezhttp_parse_json_response(hRequest);
+
+    if(hRequestHandle == EzInvalid_JSON)
+    {
+        if(g_iPluginFlags & AMX_FLAG_DEBUG)
+            server_print("[DEBUG] %s::OnPlayerSummaries() - Json Error", __BINARY__);
+        return;
+    }
+    
+    ezjson_serial_to_string(hRequestHandle, szResponse, charsmax(szResponse));
+    hJson = ezjson_parse(szResponse);
+
+    if(ezjson_get_type(hJson) == EzJSONObject)
+    {
+        new EzJSON:hResponse = ezjson_object_get_value(hJson, "response");
+        if(ezjson_get_type(hResponse) == EzJSONObject)
+        {
+            new EzJSON:hPlayers = ezjson_object_get_value(hResponse, "players");
+            if(ezjson_get_type(hPlayers) == EzJSONArray && ezjson_array_get_count(hPlayers) == 1)
+            {
+                new EzJSON:hPlayerSummary = ezjson_array_get_value(hPlayers, 0);
+                if(ezjson_get_type(hPlayerSummary) == EzJSONObject)
+                {
+                    // hack: we can't pass iClient to this callback so we have to do this fugly mess
+                    new szSteam64[MAX_STEAM64_LENGTH], szOtherSteam64[MAX_STEAM64_LENGTH];
+                    ezjson_object_get_string(hPlayerSummary, "steamid", szSteam64, charsmax(szSteam64));
+                    new iClient = 0;
+                    for(new iOther = 1; iOther < MaxClients; iOther++)
+                    {
+                        if(is_user_connected(iOther))
+                        {
+                            get_user_info(iOther, "*sid", szOtherSteam64, charsmax(szOtherSteam64));
+                            if(equal(szSteam64, szOtherSteam64))
+                            {
+                                iClient = iOther;
+                                break;
+                            }
+                        }
+                    }
+                    if(iClient)
+                        ezjson_object_get_string(hPlayerSummary, "avatarfull", g_szSteamAvatar[iClient], BASE_URL_LENGTH);
+                }
+                ezjson_free(hPlayerSummary);
+            }
+            ezjson_free(hPlayers);
+        }
+        ezjson_free(hResponse);
+    }
+    ezjson_free(hJson);
 }
 
 ShowJoinMessage(iClient)
