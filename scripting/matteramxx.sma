@@ -1176,18 +1176,18 @@ public OnPlayerSummaries(EzHttpRequest:hRequest)
                     new szSteam64[MAX_STEAM64_LENGTH], szOtherSteam64[MAX_STEAM64_LENGTH];
                     ezjson_object_get_string(hPlayerSummary, "steamid", szSteam64, charsmax(szSteam64));
                     new iClient = 0;
-                    for(new iOther = 1; iOther < MaxClients; iOther++)
+                    new rgPlayers[MAX_PLAYERS], iClientCount;
+                    get_players_ex(rgPlayers, iClientCount, GetPlayers_ExcludeBots | GetPlayers_ExcludeHLTV | GetPlayers_IncludeConnecting);
+                    for(new iIndex = 0; iIndex < iClientCount; iIndex++)
                     {
-                        if(is_user_connected(iOther))
+                        get_user_info(rgPlayers[iIndex], "*sid", szOtherSteam64, charsmax(szOtherSteam64));
+                        if(equal(szSteam64, szOtherSteam64))
                         {
-                            get_user_info(iOther, "*sid", szOtherSteam64, charsmax(szOtherSteam64));
-                            if(equal(szSteam64, szOtherSteam64))
-                            {
-                                iClient = iOther;
-                                break;
-                            }
+                            iClient = rgPlayers[iIndex];
+                            break;
                         }
                     }
+                    
                     if(iClient)
                         ezjson_object_get_string(hPlayerSummary, "avatarfull", g_szSteamAvatar[iClient], BASE_URL_LENGTH);
                 }
